@@ -186,6 +186,22 @@ function entraHoje(periodos){
     });
 }
 
+    // ------------------ SELECIONAR MÊS ATUAL AUTOMATICAMENTE ------------------
+(function selecionarMesAtual(){
+    const hoje = new Date();
+    const mes = String(hoje.getMonth() + 1).padStart(2,"0");
+    const ano = hoje.getFullYear();
+
+    let chave = ${ano}-${mes};
+
+    const opt = document.querySelector(#mesSelect option[value="${chave}"]);
+    if (opt) {
+        mesSelect.value = chave;
+    } else {
+        mesSelect.value = "todos"; // fallback
+    }
+})();
+
 /* ------------------ MONTAR LISTA ------------------ */
 function montarLista(){
     const filtroFunc = funcSelect.value;
@@ -294,8 +310,14 @@ async function carregarFolgasDoBanco(){
 
         data.forEach(row => {
             const pessoa = folgas.find(p => p.nome === row.funcionario);
-            const iniISO = (new Date(row.inicio)).toISOString().slice(0,16).replace('T',' ');
-            const fimISO = (new Date(row.fim)).toISOString().slice(0,16).replace('T',' ');
+            // Converte sem alterar fuso — interpreta como horário local
+function toLocalNoTZ(str){
+    const d = new Date(str); 
+    return ${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())};
+}
+
+const iniISO = toLocalNoTZ(row.inicio);
+const fimISO = toLocalNoTZ(row.fim);
 
             if (pessoa) {
                 pessoa.periodos.push([iniISO, fimISO]);
@@ -329,7 +351,7 @@ async function salvarTodasNoBanco(){
             f.periodos.forEach(p => {
                 const dtIni = parseDateTime(p[0]);
                 const dtFim = parseDateTime(p[1]);
-                linhas.push({ funcionario: f.nome, inicio: dtIni.toISOString(), fim: dtFim.toISOString() });
+                linhas.push({ funcionario: f.nome, inicio: ${p[0]}:00, fim: ${p[1]}:00 });
             });
         });
         if(linhas.length){
@@ -398,3 +420,4 @@ montarLista();
 </script>
 </body>
 </html>
+
