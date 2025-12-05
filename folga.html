@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Escala de Folgas</title>
+<style>
+    body { font-family: Arial, sans-serif; background:#eef1f5; margin:0; padding:20px; }
+    h2 { text-align:center; margin-bottom:12px; }
+    .controls { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    select, button { padding:10px; font-size:14px; border-radius:8px; border:1px solid #bbb; cursor:pointer; }
+    button.primary { background:#007bff; color:white; border:none; }
+    button.green { background:#4caf50; color:white; border:none; }
+    button.orange { background:#ff9800; color:white; border:none; }
+    button.red { background:#d9534f; color:white; border:none; }
+    .pessoa { background:white; padding:14px; margin-bottom:16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); transition:0.2s; }
+    .em-folga { background:#c4f7c4 !important; border-left:6px solid #2e8b57; }
+    .entra-hoje { background:#ffd2d2 !important; border-left:6px solid #c62828; }
+    .titulo { font-size:18px; font-weight:700; margin-bottom:8px; }
+    .folga-item { padding:6px 0; }
+    .data { font-weight:700; color:#222; }
+    .hora { color:#444; }
+    hr { border:none; border-bottom:1px solid #e6e6e6; margin:8px 0; }
+    .small { font-size:13px; color:#666; }
+</style>
+</head>
+<body>
+
+<h2>Escala de Folgas</h2>
+
+<div class="controls">
+    <select id="funcSelect"><option value="todos">Todos Funcionários</option></select>
+
+    <select id="mesSelect">
+        <option value="todos">Todos os meses</option>
+        <option value="2025-12">Dezembro 2025</option>
+        <option value="2026-01">Janeiro 2026</option>
+        <option value="2026-02">Fevereiro 2026</option>
+        <option value="2026-03">Março 2026</option>
+        <option value="2026-04">Abril 2026</option>
+        <option value="2026-05">Maio 2026</option>
+        <option value="2026-06">Junho 2026</option>
+        <option value="2026-07">Julho 2026</option>
+        <option value="2026-08">Agosto 2026</option>
+        <option value="2026-09">Setembro 2026</option>
+        <option value="2026-10">Outubro 2026</option>
+        <option value="2026-11">Novembro 2026</option>
+        <option value="2026-12">Dezembro 2026</option>
+    </select>
+
+    <button class="primary" onclick="mostrarFolgasAgora()">Quem está de folga agora?</button>
+
+    <button class="small" onclick="carregarFolgasDoBanco()">Carregar da Nuvem</button>
+    <button class="small" onclick="salvarTodasNoBanco()">Salvar na Nuvem</button>
+</div>
+
+<div id="lista"></div>
+
+<!-- Supabase UMD -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<script>
+/* ====== CONFIGURE AQUI ======
+   Substitua pelos valores do seu projeto Supabase (Project URL e anon public key)
+   NÃO coloque a service_role (sb_secret_...), use somente a public anon key (começa com eyJ...)
+*/
+const SUPABASE_URL = "https://gaqazvekgpvecuhfuiel.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcWF6dmVrZ3B2ZWN1aGZ1aWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MDc1NDQsImV4cCI6MjA4MDQ4MzU0NH0.crmOSloZVI0CMuJkIBLfOI6yKiT8dmEa10xrQnFBIcM";
+
+/* inicializa supabase (cliente) */
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ------------------ HELPERS ------------------ */
+function pad2(n){ return n.toString().padStart(2,"0"); }
+
+function parseDateTime(str){
+    const parts = String(str).split(" ");
+    if(parts.length < 2){
+        const d = new Date(str);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
+    }
+    const [d,t] = parts;
+    const [Y,M,D] = d.split("-").map(Number);
+    const [h,m] = t.split(":").map(Number);
+    return new Date(Y, M-1, D, h, m);
+}
+
+function formatDateTime(dt){
+    return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+}
+
+function formatDateInput(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`; }
+function formatTimeInput(dt){ return `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`; }
+
+/* ------------------ DADOS INICIAIS (DEZ/2025) ------------------ */
+const folgas = [
+    { nome:"Anderson Saraiva Serrano", editando:false, periodos:[
+        ["2025-12-02 07:00","2025-12-03 19:00"],
+        ["2025-12-10 19:00","2025-12-12 07:00"],
+        ["2025-12-19 07:00","2025-12-20 19:00"],
+        ["2025-12-27 19:00","2025-12-29 07:00"],
+        ["2025-12-30 07:00","2025-12-31 19:00"]
+    ]},
+    { nome:"Henrique", editando:false, periodos:[
+        ["2025-12-03 19:00","2025-12-05 07:00"],
+        ["2025-12-12 07:00","2025-12-13 19:00"],
+        ["2025-12-20 19:00","2025-12-22 07:00"],
+        ["2025-12-23 07:00","2025-12-24 19:00"],
+        ["2025-12-31 19:00","2026-01-02 07:00"]
+    ]},
+    { nome:"João", editando:false, periodos:[
+        ["2025-12-05 07:00","2025-12-06 19:00"],
+        ["2025-12-13 19:00","2025-12-15 07:00"],
+        ["2025-12-16 07:00","2025-12-17 19:00"],
+        ["2025-12-24 19:00","2025-12-26 07:00"]
+    ]},
+    { nome:"Rafael", editando:false, periodos:[
+        ["2025-12-06 19:00","2025-12-08 07:00"],
+        ["2025-12-09 07:00","2025-12-10 19:00"],
+        ["2025-12-17 19:00","2025-12-19 07:00"],
+        ["2025-12-26 07:00","2025-12-27 19:00"]
+    ]},
+    { nome:"Vanderlei", editando:false, periodos:[
+        ["2025-12-06 19:00","2025-12-08 07:00"],
+        ["2025-12-09 07:00","2025-12-10 19:00"],
+        ["2025-12-17 19:00","2025-12-19 07:00"],
+        ["2025-12-26 07:00","2025-12-27 19:00"]
+    ]}
+];
+
+/* ------------------ GERA FOLGAS ATE 31/12/2026 (COM REGRAS) ------------------ */
+function gerarFolgasAte2026(){
+    const limite = new Date(2026,11,31,23,59);
+    folgas.forEach(pessoa => {
+        if(!pessoa.periodos || pessoa.periodos.length===0) return;
+        let ultFim = parseDateTime(pessoa.periodos[pessoa.periodos.length-1][1]);
+
+        while(true){
+            let proxInicio;
+            if(ultFim.getDay() === 1){
+                proxInicio = new Date(ultFim);
+                proxInicio.setDate(proxInicio.getDate() + 1);
+                proxInicio.setHours(7,0,0,0);
+            } else {
+                proxInicio = new Date(ultFim.getTime() + 7 * 24 * 60 * 60 * 1000);
+                if(proxInicio.getDay() === 1){
+                    proxInicio.setDate(proxInicio.getDate() + 1);
+                    proxInicio.setHours(7,0,0,0);
+                }
+            }
+            if(proxInicio > limite) break;
+            const proxFim = new Date(proxInicio.getTime() + 36 * 60 * 60 * 1000);
+            pessoa.periodos.push([ formatDateTime(proxInicio), formatDateTime(proxFim) ]);
+            ultFim = proxFim;
+        }
+    });
+
+    const r = folgas.find(x=>x.nome==="Rafael");
+    const v = folgas.find(x=>x.nome==="Vanderlei");
+    if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
+}
+
+/* ------------------ POPULAR SELECTS ------------------ */
+const funcSelect = document.getElementById("funcSelect");
+const mesSelect = document.getElementById("mesSelect");
+folgas.forEach(f => {
+    const o = document.createElement("option");
+    o.value = f.nome; o.textContent = f.nome; funcSelect.appendChild(o);
+});
+
+/* ------------------ DESTAQUES ------------------ */
+function estaDeFolga(periodos){
+    const agora = new Date();
+    return periodos.some(p => {
+        const ini = parseDateTime(p[0]); const fim = parseDateTime(p[1]);
+        return agora >= ini && agora <= fim;
+    });
+}
+function entraHoje(periodos){
+    const hoje = new Date();
+    const s = `${hoje.getFullYear()}-${pad2(hoje.getMonth()+1)}-${pad2(hoje.getDate())}`;
+    return periodos.some(p => {
+        if(!p[0].startsWith(s)) return false;
+        const h = parseDateTime(p[0]).getHours();
+        return h >= 18;
+    });
+}
+
+/* ------------------ MONTAR LISTA ------------------ */
+function montarLista(){
+    const filtroFunc = funcSelect.value;
+    const filtroMes = mesSelect.value;
+    const lista = document.getElementById("lista");
+    lista.innerHTML = "";
+
+    folgas.forEach(pessoa => {
+        if(filtroFunc !== "todos" && pessoa.nome !== filtroFunc) return;
+        const div = document.createElement("div");
+        div.classList.add("pessoa");
+        if(estaDeFolga(pessoa.periodos)) div.classList.add("em-folga");
+        else if(entraHoje(pessoa.periodos)) div.classList.add("entra-hoje");
+
+        let periodosFiltrados = pessoa.periodos;
+        if(!pessoa.editando && filtroMes !== "todos"){
+            periodosFiltrados = pessoa.periodos.filter(p => p[0].slice(0,7) === filtroMes);
+            if(periodosFiltrados.length === 0) return;
+        }
+
+        if(pessoa.editando){
+            div.innerHTML = `
+                <div class="titulo">${pessoa.nome}</div>
+                <div style="margin-bottom:8px; font-weight:700;">Editando folgas (todas):</div>
+                ${pessoa.periodos.map((p,i) => {
+                    const ini = parseDateTime(p[0]), fim = parseDateTime(p[1]);
+                    return `<div style="background:#f8f8f8;padding:10px;border-radius:8px;margin-bottom:12px;">
+                        <b>Período ${i+1}</b><br><br>
+                        Data início:<br><input type="date" id="inicioData_${pessoa.nome}_${i}" value="${formatDateInput(ini)}" style="padding:6px;width:95%"><br><br>
+                        Hora início:<br><input type="time" id="inicioHora_${pessoa.nome}_${i}" value="${formatTimeInput(ini)}" style="padding:6px;width:95%"><br><br>
+                        Data fim:<br><input type="date" id="fimData_${pessoa.nome}_${i}" value="${formatDateInput(fim)}" style="padding:6px;width:95%"><br><br>
+                        Hora fim:<br><input type="time" id="fimHora_${pessoa.nome}_${i}" value="${formatTimeInput(fim)}" style="padding:6px;width:95%"><br><br>
+                        <button class="red" onclick="removerFolga('${pessoa.nome}', ${i})">🗑 Remover</button>
+                    </div>`; }).join("")}
+                <button class="primary" onclick="adicionarFolga('${pessoa.nome}')">➕ Adicionar nova folga</button>
+                <div style="height:8px"></div>
+                <button class="green" onclick="salvarEdicao('${pessoa.nome}')">✔ Salvar</button>
+                <button class="red" onclick="cancelarEdicao('${pessoa.nome}')">✖ Cancelar</button>
+            `;
+        } else {
+            div.innerHTML = `
+                <div class="titulo">${pessoa.nome}</div>
+                <button class="green" onclick="copiarFolgas('${pessoa.nome}')">📋 Copiar Folgas</button>
+                <button class="orange" onclick="habilitarEdicao('${pessoa.nome}')">✏ Editar Folgas</button>
+                ${periodosFiltrados.map((p,i) => {
+                    const ini=parseDateTime(p[0]), fim=parseDateTime(p[1]);
+                    return `<div class="folga-item">
+                        <div class="data">🗓 ${ini.toLocaleDateString("pt-BR")} → ${fim.toLocaleDateString("pt-BR")}</div>
+                        <div class="hora">⏰ Das ${ini.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})} às ${fim.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})}</div>
+                    </div>${i<periodosFiltrados.length-1?'<hr':''}`; }).join("")}
+            `;
+        }
+
+        lista.appendChild(div);
+    });
+}
+
+/* ------------------ EDIÇÃO ------------------ */
+function habilitarEdicao(nome){ const f=folgas.find(x=>x.nome===nome); f.editando=true; montarLista(); }
+function cancelarEdicao(nome){ const f=folgas.find(x=>x.nome===nome); f.editando=false; montarLista(); }
+
+function adicionarFolga(nome){
+    const f = folgas.find(x=>x.nome===nome);
+    if(!f.periodos.length){
+        f.periodos.push(["2026-01-01 07:00","2026-01-02 19:00"]);
+    } else {
+        const lastEnd = parseDateTime(f.periodos[f.periodos.length-1][1]);
+        let proxStart;
+        if(lastEnd.getDay()===1){
+            proxStart = new Date(lastEnd); proxStart.setDate(proxStart.getDate()+1); proxStart.setHours(7,0,0,0);
+        } else {
+            proxStart = new Date(lastEnd.getTime() + 7*24*60*60*1000);
+            if(proxStart.getDay()===1){ proxStart.setDate(proxStart.getDate()+1); proxStart.setHours(7,0,0,0); }
+        }
+        const proxEnd = new Date(proxStart.getTime() + 36*60*60*1000);
+        f.periodos.push([ formatDateTime(proxStart), formatDateTime(proxEnd) ]);
+    }
+    montarLista();
+}
+
+function removerFolga(nome,index){ const f=folgas.find(x=>x.nome===nome); f.periodos.splice(index,1); montarLista(); }
+
+/* ------------------ SUPABASE: CARREGAR e SALVAR ------------------ */
+async function carregarFolgasDoBanco(){
+    try {
+        const { data, error } = await supabaseClient
+            .from('folgas')
+            .select('*')
+            .order('inicio', { ascending: true });
+
+        if (error) {
+            console.error(error);
+            alert("Erro ao carregar do Supabase.");
+            return;
+        }
+
+        // 🚫 Se o banco estiver vazio, NÃO APAGA os dados locais
+        if (!data || data.length === 0) {
+            alert("Banco está vazio — mantendo as folgas locais.");
+            montarLista();
+            return;
+        }
+
+        // 🧹 Se chegou aqui, o banco tem dados → substituir localmente
+        folgas.forEach(f => f.periodos = []);
+
+        data.forEach(row => {
+            const pessoa = folgas.find(p => p.nome === row.funcionario);
+            const iniISO = (new Date(row.inicio)).toISOString().slice(0,16).replace('T',' ');
+            const fimISO = (new Date(row.fim)).toISOString().slice(0,16).replace('T',' ');
+
+            if (pessoa) {
+                pessoa.periodos.push([iniISO, fimISO]);
+            } else {
+                folgas.push({
+                    nome: row.funcionario,
+                    editando:false,
+                    periodos:[[iniISO, fimISO]]
+                });
+            }
+        });
+
+        // Rafael e Vanderlei iguais
+        const r = folgas.find(x=>x.nome==="Rafael");
+        const v = folgas.find(x=>x.nome==="Vanderlei");
+        if (r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
+
+        montarLista();
+        alert("Dados carregados da nuvem!");
+    } catch(e){
+        console.error(e);
+        alert("Erro ao carregar da nuvem.");
+    }
+}
+
+async function salvarTodasNoBanco(){
+    try{
+        await supabaseClient.from('folgas').delete().neq('id',0);
+        const linhas = [];
+        folgas.forEach(f => {
+            f.periodos.forEach(p => {
+                const dtIni = parseDateTime(p[0]);
+                const dtFim = parseDateTime(p[1]);
+                linhas.push({ funcionario: f.nome, inicio: dtIni.toISOString(), fim: dtFim.toISOString() });
+            });
+        });
+        if(linhas.length){
+            const { error } = await supabaseClient.from('folgas').insert(linhas);
+            if(error){ console.error(error); alert("Erro ao inserir no banco."); return; }
+        }
+        alert("Salvo na nuvem com sucesso!");
+    }catch(err){
+        console.error(err); alert("Erro ao salvar na nuvem.");
+    }
+}
+
+/* ------------------ salvar edição ------------------ */
+async function salvarEdicao(nome){
+    const f = folgas.find(x=>x.nome===nome);
+    const novos = [];
+    for(let i=0;i<f.periodos.length;i++){
+        const di = document.getElementById(`inicioData_${nome}_${i}`).value;
+        const hi = document.getElementById(`inicioHora_${nome}_${i}`).value;
+        const df = document.getElementById(`fimData_${nome}_${i}`).value;
+        const hf = document.getElementById(`fimHora_${nome}_${i}`).value;
+        if(!di||!hi||!df||!hf){ alert("Preencha todos os campos."); return; }
+        novos.push([ `${di} ${hi}`, `${df} ${hf}` ]);
+    }
+    f.periodos = novos;
+    f.editando = false;
+    montarLista();
+    await salvarTodasNoBanco();
+}
+
+/* ------------------ COPIAR FOLGAS ------------------ */
+function copiarFolgas(nome){
+    const f = folgas.find(x=>x.nome===nome);
+    const filtroMes = mesSelect.value;
+    let periodos = f.periodos;
+    if(filtroMes !== "todos") periodos = f.periodos.filter(p=>p[0].slice(0,7)===filtroMes);
+    if(periodos.length===0){ alert("Esse motorista não tem folgas no mês selecionado."); return; }
+    let referencia = "";
+    if(filtroMes!=="todos"){ referencia = `${periodos[0][0].slice(5,7)}/${periodos[0][0].slice(0,4)}`; }
+    let texto = `Olá ${f.nome}! Aqui está sua escala de folgas`;
+    if(referencia) texto += ` para ${referencia}`;
+    texto += `:\n\n` + periodos.map(p=>{
+        const ini = parseDateTime(p[0]), fim = parseDateTime(p[1]);
+        const inicioFmt = ini.toLocaleDateString("pt-BR") + " " + ini.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'});
+        const fimFmt = fim.toLocaleDateString("pt-BR") + " " + fim.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'});
+        return `- ${inicioFmt} até ${fimFmt}`;
+    }).join("\n");
+    navigator.clipboard.writeText(texto).then(()=> alert("Folgas copiadas para a área de transferência!"))
+        .catch(()=> alert("Não foi possível copiar automaticamente, copie manualmente."));
+}
+
+/* ------------------ QUEM ESTÁ DE FOLGA AGORA ------------------ */
+function mostrarFolgasAgora(){
+    const em = folgas.filter(f=> estaDeFolga(f.periodos));
+    if(em.length===0) alert("Ninguém está de folga agora.");
+    else alert("Em folga agora:\n\n" + em.map(x=>x.nome).join("\n"));
+}
+
+/* ------------------ INICIALIZAÇÃO ------------------ */
+gerarFolgasAte2026();
+
+funcSelect.addEventListener("change", montarLista);
+mesSelect.addEventListener("change", montarLista);
+montarLista();
+
+</script>
+</body>
+</html>
