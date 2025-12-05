@@ -97,32 +97,27 @@ const folgas = [
         ["2025-12-17 19:00","2025-12-19 07:00"],
         ["2025-12-26 07:00","2025-12-27 19:00"]
     ]},
-    { nome:"Vanderlei", editando:false, periodos:[
-        ["2025-12-06 19:00","2025-12-08 07:00"],
-        ["2025-12-09 07:00","2025-12-10 19:00"],
-        ["2025-12-17 19:00","2025-12-19 07:00"],
-        ["2025-12-26 07:00","2025-12-27 19:00"]
-    ]}
+    { nome:"Vanderlei", editando:false, periodos:[] }
 ];
+
+/* Rafael e Vanderlei iguais */
+folgas[4].periodos = JSON.parse(JSON.stringify(folgas[3].periodos));
 
 /* ---------------- GERAR MESES NO SELECT ---------------- */
 (function gerarMeses(){
     const sel = document.getElementById("mesSelect");
     const atual = new Date();
-    const anoInicio = 2025, anoFim = 2026;
 
-    for(let ano=anoInicio; ano<=anoFim; ano++){
+    for(let ano=2025; ano<=2026; ano++){
         for(let mes=1; mes<=12; mes++){
-            const value = `${ano}-${pad2(mes)}`;
-            const nome = new Date(ano, mes-1, 1).toLocaleDateString("pt-BR",{month:"long"});
             const opt = document.createElement("option");
-            opt.value = value;
-            opt.textContent = `${nome} ${ano}`;
+            opt.value = `${ano}-${pad2(mes)}`;
+            const nomeMes = new Date(ano, mes-1, 1).toLocaleDateString("pt-BR",{month:"long"});
+            opt.textContent = `${nomeMes} ${ano}`;
             sel.appendChild(opt);
         }
     }
 
-    // SELECIONA AUTOMATICAMENTE O MÊS ATUAL
     sel.value = `${atual.getFullYear()}-${pad2(atual.getMonth()+1)}`;
 })();
 
@@ -134,60 +129,51 @@ function gerarFolgasAte2026(){
         let ultFim = parseDateTime(pessoa.periodos[pessoa.periodos.length-1][1]);
 
         while(true){
-            let proxInicio;
+            let inicio;
 
             if(ultFim.getDay() === 1){
-                proxInicio = new Date(ultFim);
-                proxInicio.setDate(proxInicio.getDate()+1);
-                proxInicio.setHours(7,0,0,0);
+                inicio = new Date(ultFim);
+                inicio.setDate(inicio.getDate()+1);
+                inicio.setHours(7,0,0,0);
             } else {
-                proxInicio = new Date(ultFim.getTime() + 7*24*60*60*1000);
-                if(proxInicio.getDay() === 1){
-                    proxInicio.setDate(proxInicio.getDate()+1);
-                    proxInicio.setHours(7,0,0,0);
+                inicio = new Date(ultFim.getTime() + 7*24*60*60*1000);
+                if(inicio.getDay() === 1){
+                    inicio.setDate(inicio.getDate()+1);
+                    inicio.setHours(7,0,0,0);
                 }
             }
 
-            if(proxInicio > limite) break;
+            if(inicio > limite) break;
 
-            const proxFim = new Date(proxInicio.getTime() + 36*60*60*1000);
+            const fim = new Date(inicio.getTime() + 36*60*60*1000);
+            pessoa.periodos.push([formatDateTime(inicio), formatDateTime(fim)]);
 
-            pessoa.periodos.push([formatDateTime(proxInicio), formatDateTime(proxFim)]);
-
-            ultFim = proxFim;
+            ultFim = fim;
         }
     });
 
-    const r = folgas.find(x=>x.nome==="Rafael");
-    const v = folgas.find(x=>x.nome==="Vanderlei");
-    if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
+    /* Rafael = Vanderlei */
+    folgas[4].periodos = JSON.parse(JSON.stringify(folgas[3].periodos));
 }
 
 /* ---------------- MONTAR LISTA ---------------- */
 function estaDeFolga(periodos){
-    const agora = new Date();
-    return periodos.some(([ini,fim]) => {
-        return agora >= parseDateTime(ini) && agora <= parseDateTime(fim);
-    });
-}
-
-function entraHoje(periodos){
-    const hoje = new Date();
-    const prefix = `${hoje.getFullYear()}-${pad2(hoje.getMonth()+1)}-${pad2(hoje.getDate())}`;
-    return periodos.some(([ini]) => ini.startsWith(prefix) && parseDateTime(ini).getHours() >= 18);
+    const now = new Date();
+    return periodos.some(([i,f]) => now >= parseDateTime(i) && now <= parseDateTime(f));
 }
 
 function montarLista(){
-    const filtroFunc = document.getElementById("funcSelect").value;
-    const filtroMes = document.getElementById("mesSelect").value;
+    const filtroFunc = funcSelect.value;
+    const filtroMes = mesSelect.value;
     const lista = document.getElementById("lista");
     lista.innerHTML = "";
 
     folgas.forEach(pessoa => {
         if(filtroFunc !== "todos" && pessoa.nome !== filtroFunc) return;
 
-        let mostrar = pessoa.periodos;
+        const nomeID = pessoa.nome.replace(/\s+/g,"_");
 
+        let mostrar = pessoa.periodos;
         if(filtroMes !== "todos"){
             mostrar = mostrar.filter(p => p[0].startsWith(filtroMes));
             if(mostrar.length === 0) return;
@@ -197,32 +183,35 @@ function montarLista(){
         div.classList.add("pessoa");
 
         if(estaDeFolga(pessoa.periodos)) div.classList.add("em-folga");
-        else if(entraHoje(pessoa.periodos)) div.classList.add("entra-hoje");
 
         if(pessoa.editando){
             div.innerHTML = `
                 <div class="titulo">${pessoa.nome}</div>
-                ${pessoa.periodos.map((p,i)=>{
+
+                ${mostrar.map((p,i)=>{
                     const ini = parseDateTime(p[0]), fim = parseDateTime(p[1]);
                     return `
                     <div style="background:#eee;padding:10px;margin-bottom:10px;border-radius:8px;">
-                        <b>Período ${i+1}</b><br>
+                        <b>Período ${i+1}</b><br><br>
+
                         Início:<br>
-                        <input type="date" id="inicioData_${pessoa.nome}_${i}" value="${formatDateInput(ini)}"><br>
-                        <input type="time" id="inicioHora_${pessoa.nome}_${i}" value="${formatTimeInput(ini)}"><br><br>
+                        <input type="date" id="iniData_${nomeID}_${i}" value="${formatDateInput(ini)}"><br>
+                        <input type="time" id="iniHora_${nomeID}_${i}" value="${formatTimeInput(ini)}"><br><br>
 
                         Fim:<br>
-                        <input type="date" id="fimData_${pessoa.nome}_${i}" value="${formatDateInput(fim)}"><br>
-                        <input type="time" id="fimHora_${pessoa.nome}_${i}" value="${formatTimeInput(fim)}"><br><br>
+                        <input type="date" id="fimData_${nomeID}_${i}" value="${formatDateInput(fim)}"><br>
+                        <input type="time" id="fimHora_${nomeID}_${i}" value="${formatTimeInput(fim)}"><br><br>
 
                         <button class="red" onclick="removerFolga('${pessoa.nome}',${i})">🗑 Remover</button>
                     </div>`;
                 }).join("")}
-                <button class="primary" onclick="adicionarFolga('${pessoa.nome}')">➕ Adicionar Folga</button>
+
+                <button class="primary" onclick="adicionarFolga('${pessoa.nome}')">➕ Adicionar</button>
                 <button class="green" onclick="salvarEdicao('${pessoa.nome}')">Salvar</button>
                 <button class="red" onclick="cancelarEdicao('${pessoa.nome}')">Cancelar</button>
             `;
-        } else {
+        } 
+        else {
             div.innerHTML = `
                 <div class="titulo">${pessoa.nome}</div>
                 <button class="green" onclick="copiarFolgas('${pessoa.nome}')">📋 Copiar</button>
@@ -236,8 +225,8 @@ function montarLista(){
                                 🗓 ${ini.toLocaleDateString("pt-BR")} → ${fim.toLocaleDateString("pt-BR")}
                             </div>
                             <div class="hora">
-                                ⏰ Das ${ini.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})}
-                                às ${fim.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})}
+                                ⏰ ${ini.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})} → 
+                                   ${fim.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})}
                             </div>
                         </div>
                         ${i<mostrar.length-1?'<hr>':''}
@@ -250,22 +239,19 @@ function montarLista(){
     });
 }
 
-/* ---------------- EDITAR ---------------- */
+/* ---------------- AÇÕES ---------------- */
 function editar(nome){
-    const f = folgas.find(x=>x.nome===nome);
-    f.editando = true;
+    folgas.find(f=>f.nome===nome).editando = true;
     montarLista();
 }
 
 function cancelarEdicao(nome){
-    const f = folgas.find(x=>x.nome===nome);
-    f.editando = false;
+    folgas.find(f=>f.nome===nome).editando = false;
     montarLista();
 }
 
 function removerFolga(nome, idx){
-    const f = folgas.find(x=>x.nome===nome);
-    f.periodos.splice(idx,1);
+    folgas.find(f=>f.nome===nome).periodos.splice(idx,1);
     montarLista();
 }
 
@@ -274,6 +260,7 @@ function adicionarFolga(nome){
     const lastEnd = parseDateTime(f.periodos[f.periodos.length-1][1]);
 
     let inicio;
+
     if(lastEnd.getDay() === 1){
         inicio = new Date(lastEnd);
         inicio.setDate(inicio.getDate()+1);
@@ -292,7 +279,35 @@ function adicionarFolga(nome){
     montarLista();
 }
 
-/* ---------------- SALVAR E CARREGAR ---------------- */
+async function salvarEdicao(nome){
+    const pessoa = folgas.find(f=>f.nome===nome);
+    const nomeID = nome.replace(/\s+/g,"_");
+
+    const filtroMes = mesSelect.value;
+    const novos = [];
+
+    pessoa.periodos.forEach((p,i)=>{
+        if(!p[0].startsWith(filtroMes)) {
+            novos.push(p);
+            return;
+        }
+
+        const di = document.getElementById(`iniData_${nomeID}_${i}`).value;
+        const hi = document.getElementById(`iniHora_${nomeID}_${i}`).value;
+        const df = document.getElementById(`fimData_${nomeID}_${i}`).value;
+        const hf = document.getElementById(`fimHora_${nomeID}_${i}`).value;
+
+        novos.push([`${di} ${hi}`, `${df} ${hf}`]);
+    });
+
+    pessoa.periodos = novos;
+    pessoa.editando = false;
+    montarLista();
+
+    await salvarTodasNoBanco();
+}
+
+/* ---------------- SUPABASE ---------------- */
 async function carregarFolgasDoBanco(){
     const {data,error} = await supabaseClient.from("folgas").select("*").order("inicio");
 
@@ -305,10 +320,6 @@ async function carregarFolgasDoBanco(){
         if(f) f.periodos.push([r.inicio, r.fim]);
     });
 
-    const r = folgas.find(x=>x.nome==="Rafael");
-    const v = folgas.find(x=>x.nome==="Vanderlei");
-    if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
-
     montarLista();
     alert("Carregado!");
 }
@@ -319,24 +330,25 @@ async function salvarTodasNoBanco(){
     const linhas = [];
     folgas.forEach(f=>{
         f.periodos.forEach(p=>{
-            linhas.push({
-                funcionario: f.nome,
-                inicio: p[0],
-                fim: p[1]
-            });
+            linhas.push({ funcionario:f.nome, inicio:p[0], fim:p[1] });
         });
     });
 
     const {error} = await supabaseClient.from("folgas").insert(linhas);
     if(error){ alert("Erro ao salvar."); return; }
-
     alert("Salvo!");
 }
 
 /* ---------------- OUTROS ---------------- */
+function mostrarFolgasAgora(){
+    const em = folgas.filter(f=>estaDeFolga(f.periodos));
+    if(em.length===0) alert("Ninguém está de folga agora.");
+    else alert("Em folga:\n" + em.map(x=>x.nome).join("\n"));
+}
+
 function copiarFolgas(nome){
-    const f = folgas.find(x=>x.nome===nome);
-    const filtroMes = document.getElementById("mesSelect").value;
+    const f = folgas.find(f=>f.nome===nome);
+    const filtroMes = mesSelect.value;
 
     let lista = f.periodos;
     if(filtroMes !== "todos") lista = lista.filter(p=>p[0].startsWith(filtroMes));
@@ -348,16 +360,7 @@ function copiarFolgas(nome){
     alert("Copiado!");
 }
 
-function mostrarFolgasAgora(){
-    const em = folgas.filter(f=>estaDeFolga(f.periodos));
-    if(em.length===0) alert("Ninguém está de folga.");
-    else alert("Em folga:\n" + em.map(x=>x.nome).join("\n"));
-}
-
 /* ---------------- INICIAR ---------------- */
 gerarFolgasAte2026();
 montarLista();
 </script>
-
-</body>
-</html>
