@@ -1,70 +1,133 @@
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Escala de Folgas</title>
+
+<!-- jsPDF + autoTable (para gerar PDF no cliente) -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.min.js"></script>
+
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
 <style>
   :root{
     --bg:#eef1f5; --card:#fff; --text:#222; --muted:#666;
-    --accent:#007bff; --ok:#4caf50; --warn:#ff9800; --danger:#d9534f;
+    --accent:#007bff; --ok:#4caf50; --warn:#ffeb8a; --danger:#ffd2d2;
+    --warn-border:#f0d24c; --danger-border:#aa1f1f;
   }
-  .dark{ --bg:#121212; --card:#1b1b1b; --text:#e6e6e6; --muted:#aaa; --accent:#5aa9ff; }
+  .dark{
+    --bg:#121212; --card:#1b1b1b; --text:#e6e6e6; --muted:#aaa; --accent:#5aa9ff;
+    --warn:#f4f7c4; --danger:#ffd2d2;
+  }
   body { font-family: Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; padding:20px; }
   h2 { text-align:center; margin-bottom:12px; }
   .controls { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
   select, button { padding:10px; font-size:14px; border-radius:8px; border:1px solid #bbb; cursor:pointer; background:var(--card); color:var(--text); }
   button.primary { background:var(--accent); color:white; border:none; }
   button.green { background:var(--ok); color:white; border:none; }
-  button.orange { background:var(--warn); color:white; border:none; }
-  button.red { background:var(--danger); color:white; border:none; }
+  button.orange { background:var(--warn); color:black; border:none; }
+  button.red { background:var(--danger); color:black; border:none; }
   .pessoa { background:var(--card); padding:14px; margin-bottom:16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
-  .em-folga { background:#ffd2d2 !important; border-left:6px solid #aa1f1f; }
-  .entra-hoje { background:#f4f7c4 !important; border-left:6px solid #f0d24c; }
+  /* highlight areas: ensure text remains legível in dark mode by forcing black text on warn/danger backgrounds */
+  .em-folga { background:var(--danger) !important; border-left:6px solid var(--danger-border); color:black; }
+  .em-folga * { color:black !important; }
+  .entra-hoje { background:var(--warn) !important; border-left:6px solid var(--warn-border); color:black; }
+  .entra-hoje * { color:black !important; }
   .titulo { font-size:18px; font-weight:700; margin-bottom:8px; }
   .folga-item { padding:6px 0; }
   .data { font-weight:700; color:var(--text); }
   .hora { color:var(--muted); }
   hr { border:none; border-bottom:1px solid rgba(0,0,0,0.08); margin:8px 0; }
+
   /* login modal */
   .modal { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); z-index:9999; }
   .card { background:var(--card); padding:18px; border-radius:12px; width:320px; box-shadow:0 8px 30px rgba(0,0,0,0.3); color:var(--text); }
-  input[type="email"], input[type="password"]{ width:100%; padding:8px; margin:6px 0 12px; border-radius:6px; border:1px solid #ccc; background:transparent; color:var(--text); }
-  .topbar { display:flex; gap:8px; justify-content:flex-end; align-items:center; margin-bottom:12px; }
+  input[type="email"], input[type="password"], input[type="text"]{ width:100%; padding:8px; margin:6px 0 12px; border-radius:6px; border:1px solid #ccc; background:transparent; color:var(--text); }
+
+  /* floating menu (hamburger popup) */
+  .hamburger {
+    position:fixed; left:12px; top:16px; z-index:1000;
+    width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    background:var(--card); box-shadow:0 6px 18px rgba(0,0,0,0.12); cursor:pointer; border:1px solid #ccc;
+  }
+  .hamburger:hover{ transform:translateY(-2px); transition:0.12s; }
+
+  .menuPopup {
+    position:fixed; left:12px; top:70px; z-index:1000; width:300px; border-radius:10px;
+    background:var(--card); box-shadow:0 10px 30px rgba(0,0,0,0.18); padding:12px; display:none;
+  }
+  .menuPopup .row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .menuPopup label{ font-size:13px; color:var(--muted); }
+  .menuPopup .spaced{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+
+  /* small helpers */
   .small { font-size:13px; color:var(--muted); }
+  .hidden { display:none !important; }
+
+  /* responsive */
+  @media(max-width:560px){
+    .menuPopup { width:92%; left:4%; top:68px; }
+  }
 </style>
 </head>
 <body>
 
-<div class="topbar" style="position:sticky;top:0;background:transparent;padding-bottom:8px;z-index:5;">
-  <label style="display:flex;align-items:center;gap:8px;">
-    <input type="checkbox" id="darkToggle"> Modo escuro
-  </label>
-  <button id="loginBtn" class="primary">Login</button>
-  <button id="logoutBtn" style="display:none">Logout</button>
-</div>
+<!-- hamburger button -->
+<div class="hamburger" id="hamburgerBtn" title="Menu ☰">☰</div>
 
-<h2>Escala de Folgas</h2>
+<!-- menu popup -->
+<div class="menuPopup" id="menuPopup" aria-hidden="true">
+  <div class="row spaced">
+    <div>
+      <div id="menuUser" style="font-weight:700">Não conectado</div>
+      <div class="small" id="menuUserEmail"></div>
+    </div>
+    <div>
+      <button id="menuLoginBtn" class="primary small">Login</button>
+      <button id="menuLogoutBtn" class="small hidden">Logout</button>
+    </div>
+  </div>
 
-<div class="controls">
-    <select id="funcSelect"><option value="todos">Todos Funcionários</option></select>
+  <hr>
 
-    <select id="mesSelect">
-        <option value="todos">Todos os meses</option>
-    </select>
-
-    <button class="primary" onclick="mostrarFolgasAgora()">Quem está de folga agora?</button>
+  <div class="row">
     <button class="small" onclick="carregarFolgasDoBanco()">Carregar da Nuvem</button>
     <button class="small" onclick="salvarTodasNoBanco()">Salvar na Nuvem</button>
+  </div>
+
+  <div style="height:8px"></div>
+
+  <div class="row">
+    <label><input type="checkbox" id="darkToggleMenu"> Modo escuro</label>
+  </div>
+
+  <div style="height:6px"></div>
+
+  <div class="row">
+    <label style="width:100%">Funcionário</label>
+    <select id="funcSelectMenu" style="width:100%"></select>
+  </div>
+
+  <div class="row">
+    <label style="width:100%">Mês / Ano</label>
+    <select id="mesSelectMenu" style="width:100%"></select>
+  </div>
+
+  <div style="height:8px"></div>
+
+  <div class="row">
+    <button class="primary" id="gerarPdfBtn">Gerar PDF (func./mês)</button>
+  </div>
+
+  <div style="height:8px"></div>
+
+  <div class="small">Obs: notificações 12h só funcionam enquanto a aba estiver aberta.</div>
 </div>
 
-<div id="lista"></div>
-
-<!-- SUPABASE -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-<!-- LOGIN MODAL -->
+<!-- login modal -->
 <div id="loginModal" class="modal" style="display:none;">
   <div class="card">
     <h3>Entrar</h3>
@@ -80,18 +143,32 @@
   </div>
 </div>
 
+<h2>Escala de Folgas</h2>
+
+<div class="controls">
+    <select id="funcSelect"><option value="todos">Todos Funcionários</option></select>
+
+    <select id="mesSelect">
+        <option value="todos">Todos os meses</option>
+    </select>
+
+    <button class="primary" onclick="mostrarFolgasAgora()">Quem está de folga agora?</button>
+    <button class="small" onclick="scheduleLocalReminders()">Agendar notificações (local)</button>
+</div>
+
+<div id="lista"></div>
+
 <script>
-/* ---------------- CONFIG SUPABASE ---------------- */
+/* -------------- CONFIG SUPABASE -------------- */
 const SUPABASE_URL = "https://gaqazvekgpvecuhfuiel.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcWF6dmVrZ3B2ZWN1aGZ1aWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MDc1NDQsImV4cCI6MjA4MDQ4MzU0NH0.crmOSloZVI0CMuJkIBLfOI6yKiT8dmEa10xrQnFBIcM"; // já configurada por vc no Supabase (anon public) -> mantenha segura
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcWF6dmVrZ3B2ZWN1aGZ1aWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MDc1NDQsImV4cCI6MjA4MDQ4MzU0NH0.crmOSloZVI0CMuJkIBLfOI6yKiT8dmEa10xrQnFBIcM";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ---------------- HELPERS ---------------- */
+/* -------------- HELPERS -------------- */
 function pad2(n){ return n.toString().padStart(2,"0"); }
 function parseDateTime(str){
-  // espera "YYYY-MM-DD HH:MM" — se recebemos ISO passa por Date
   if(!str) return new Date(0);
-  if(str.includes("T") || str.includes("Z")) {
+  if(str.includes("T") || str.includes("Z")){
     const d = new Date(str);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
   }
@@ -104,7 +181,7 @@ function formatDateTime(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)
 function formatDateInput(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`; }
 function formatTimeInput(dt){ return `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`; }
 
-/* ---------------- DADOS INICIAIS (DEZ/2025) - caso banco vazio ---------------- */
+/* -------------- DADOS INICIAIS (fallback) -------------- */
 const folgas = [
   { nome:"Anderson Saraiva Serrano", editando:false, periodos:[
     ["2025-12-02 07:00","2025-12-03 19:00"],
@@ -134,22 +211,21 @@ const folgas = [
   ]},
   { nome:"Vanderlei", editando:false, periodos:[]}
 ];
-folgas[4].periodos = JSON.parse(JSON.stringify(folgas[3].periodos));
+folgas[5] && (folgas[5].periodos = folgas[3].periodos ? JSON.parse(JSON.stringify(folgas[3].periodos)) : []);
 
-/* ---------------- POPULAR FUNCIONÁRIOS ---------------- */
-function popularFuncionarios(){
-  const sel = document.getElementById("funcSelect");
+/* -------------- POPULAR SELECTS -------------- */
+function popularFuncionariosTo(selId){
+  const sel = document.getElementById(selId);
   sel.innerHTML = '<option value="todos">Todos Funcionários</option>';
   folgas.forEach(f => {
-    const o = document.createElement("option");
-    o.value = f.nome; o.textContent = f.nome; sel.appendChild(o);
+    const o = document.createElement("option"); o.value = f.nome; o.textContent = f.nome; sel.appendChild(o);
   });
 }
-
-/* ---------------- GERAR MESES (a partir de 2025-12 ou mês atual, o que for maior) ---------------- */
-function gerarMesesNoSelect(){
-  const sel = document.getElementById("mesSelect");
-  sel.innerHTML = '<option value="todos">Todos os meses</option>';
+function gerarMesesNoSelects(){
+  const selMain = document.getElementById("mesSelect");
+  const selMenu = document.getElementById("mesSelectMenu");
+  selMain.innerHTML = '<option value="todos">Todos os meses</option>';
+  selMenu.innerHTML = '<option value="todos">Todos os meses</option>';
   const hoje = new Date();
   const primeiroAno = 2025, primeiroMes = 12; // não mostrar meses ANTES de 2025-12
   const start = new Date(Math.max(new Date(primeiroAno, primeiroMes-1,1).getTime(), new Date(hoje.getFullYear(), hoje.getMonth(),1).getTime()));
@@ -158,17 +234,18 @@ function gerarMesesNoSelect(){
     for(let mes = (ano===anoStart?mesStart:1); mes<=12; mes++){
       const v = `${ano}-${pad2(mes)}`;
       const nome = new Date(ano, mes-1,1).toLocaleDateString("pt-BR",{month:"long"});
-      const opt = document.createElement("option"); opt.value = v; opt.textContent = `${nome} ${ano}`; sel.appendChild(opt);
+      const o1 = document.createElement("option"); o1.value = v; o1.textContent = `${nome} ${ano}`; selMain.appendChild(o1);
+      const o2 = document.createElement("option"); o2.value = v; o2.textContent = `${nome} ${ano}`; selMenu.appendChild(o2);
     }
   }
-  // selecionar mês atual se possível
+  // selecionar mês atual ou 2025-12 (mínimo)
   const atual = `${(new Date()).getFullYear()}-${pad2((new Date()).getMonth()+1)}`;
-  // se atual for anterior a 2025-12, selecionar 2025-12
   const min = `2025-12`;
-  sel.value = (atual < min ? min : atual);
+  const selVal = (atual < min ? min : atual);
+  selMain.value = selVal; selMenu.value = selVal;
 }
 
-/* ---------------- GERAR FOLGAS ATÉ 2026 (se precisar) ---------------- */
+/* -------------- REGRAS E GERAÇÃO (fallback) -------------- */
 function gerarFolgasAte2026(){
   const limite = new Date(2026,11,31,23,59);
   folgas.forEach(pessoa => {
@@ -188,12 +265,12 @@ function gerarFolgasAte2026(){
       ultFim = fim;
     }
   });
-  // garantir Rafael = Vanderlei
+  // sincronizar Rafael/Vanderlei
   const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
   if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
 }
 
-/* ---------------- ESTA DE FOLGA ---------------- */
+/* -------------- ESTA DE FOLGA -------------- */
 function estaDeFolga(periodos){
   const agora = new Date();
   return periodos.some(([ini,fim]) => {
@@ -202,7 +279,7 @@ function estaDeFolga(periodos){
   });
 }
 
-/* ---------------- MONTAR LISTA (usa filtros corretamente) ---------------- */
+/* -------------- MONTAR LISTA -------------- */
 function montarLista(){
   const filtroFunc = document.getElementById("funcSelect").value;
   const filtroMes = document.getElementById("mesSelect").value;
@@ -217,9 +294,12 @@ function montarLista(){
 
     const div = document.createElement("div"); div.classList.add("pessoa");
     if(estaDeFolga(pessoa.periodos)) div.classList.add("em-folga");
+    // destacar quem entra hoje à noite (ex: inicia no dia atual com hora >= 18)
+    const hoje = new Date();
+    const prefixHoje = `${hoje.getFullYear()}-${pad2(hoje.getMonth()+1)}-${pad2(hoje.getDate())}`;
+    if(mostrar.some(p => p[0].startsWith(prefixHoje) && parseDateTime(p[0]).getHours() >= 18)) div.classList.add("entra-hoje");
 
     if(pessoa.editando){
-      // edição mostra apenas períodos filtrados — usando índices locais (0..n-1)
       const nomeID = pessoa.nome.replace(/\s+/g,"_");
       div.innerHTML = `<div class="titulo">${pessoa.nome}</div>` +
         mostrar.map((p,i)=> {
@@ -255,20 +335,20 @@ function montarLista(){
   });
 }
 
-/* ---------- EDIÇÃO (trabalha com períodos filtrados) ---------- */
-function editar(nome){ folgas.find(f=>f.nome===nome).editando = true; montarLista(); }
-function cancelarEdicao(nome){ folgas.find(f=>f.nome===nome).editando = false; montarLista(); }
-
+/* -------------- EDIÇÃO -------------- */
+function editar(nome){ folgas.find(f=>f.nome===nome).editindo = true; montarLista(); }
+function cancelarEdicao(nome){ folgas.find(f=>f.nome===nome).editindo = false; montarLista(); }
 function removerFolgaFiltrada(nome, idxFiltrado){
   const filtroMes = document.getElementById("mesSelect").value;
   const pessoa = folgas.find(f=>f.nome===nome);
-  // encontrar período real equivalente (primeira ocorrência igual)
   const filtrados = pessoa.periodos.filter(p=> p[0].startsWith(filtroMes));
   const periodo = filtrados[idxFiltrado];
   pessoa.periodos = pessoa.periodos.filter(p => !(p[0] === periodo[0] && p[1] === periodo[1]));
+  // manter Rafael/Vanderlei sincronizados
+  const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
+  if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
   montarLista();
 }
-
 function adicionarFolga(nome){
   const pessoa = folgas.find(f=>f.nome===nome);
   const lastEnd = parseDateTime(pessoa.periodos[pessoa.periodos.length-1][1]);
@@ -277,13 +357,10 @@ function adicionarFolga(nome){
   else { inicio = new Date(lastEnd.getTime() + 7*24*60*60*1000); if(inicio.getDay()===1){ inicio.setDate(inicio.getDate()+1); inicio.setHours(7,0,0,0); } }
   const fim = new Date(inicio.getTime() + 36*60*60*1000);
   pessoa.periodos.push([ formatDateTime(inicio), formatDateTime(fim) ]);
-  // manter Rafael/Vanderlei sincronizados
   const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
   if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
   montarLista();
 }
-
-/* salva apenas os períodos visíveis no mês filtrado (mantendo os demais) */
 async function salvarEdicao(nome){
   const pessoa = folgas.find(f=>f.nome===nome);
   const nomeID = nome.replace(/\s+/g,"_");
@@ -301,9 +378,7 @@ async function salvarEdicao(nome){
   }
   // reconstruir lista completa mantendo períodos de outros meses
   const novos = [];
-  pessoa.periodos.forEach(p => {
-    if(!p[0].startsWith(filtroMes)) novos.push(p);
-  });
+  pessoa.periodos.forEach(p => { if(!p[0].startsWith(filtroMes)) novos.push(p); });
   novos.push(...novosFiltrados);
   pessoa.periodos = novos.sort((a,b)=> parseDateTime(a[0]) - parseDateTime(b[0]));
   pessoa.editando = false;
@@ -314,7 +389,7 @@ async function salvarEdicao(nome){
   await salvarTodasNoBanco();
 }
 
-/* ---------------- SUPABASE: CARREGAR e SALVAR ---------------- */
+/* -------------- SUPABASE: CARREGAR / SALVAR -------------- */
 async function carregarFolgasDoBanco(){
   try {
     const { data, error } = await supabaseClient.from('folgas').select('*').order('inicio',{ascending:true});
@@ -332,14 +407,16 @@ async function carregarFolgasDoBanco(){
     if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
     // ordenar períodos
     folgas.forEach(f=> f.periodos.sort((a,b)=> parseDateTime(a[0]) - parseDateTime(b[0])));
-    popularFuncionarios(); gerarMesesNoSelect(); montarLista();
+    popularFuncionariosTo('funcSelect');
+    popularFuncionariosTo('funcSelectMenu');
+    gerarMesesNoSelects();
+    montarLista();
     return true;
   } catch(e){ console.error(e); alert("Erro ao carregar do Supabase."); return false; }
 }
 
 async function salvarTodasNoBanco(){
-  try{
-    // apagar tudo e inserir (atenção: isso deleta e recria)
+  try {
     await supabaseClient.from('folgas').delete().neq('id',0);
     const linhas = [];
     folgas.forEach(f=> {
@@ -353,17 +430,22 @@ async function salvarTodasNoBanco(){
   } catch(e){ console.error(e); alert("Erro ao salvar na nuvem."); }
 }
 
-/* ---------------- LOGIN (Supabase Auth) ---------------- */
+/* -------------- LOGIN / SESSÃO -------------- */
 const loginModal = document.getElementById("loginModal");
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-loginBtn.onclick = ()=> openLogin();
-logoutBtn.onclick = async ()=>{
+const menuPopup = document.getElementById("menuPopup");
+const menuUser = document.getElementById("menuUser");
+const menuUserEmail = document.getElementById("menuUserEmail");
+const menuLoginBtn = document.getElementById("menuLoginBtn");
+const menuLogoutBtn = document.getElementById("menuLogoutBtn");
+
+menuLoginBtn.addEventListener("click", ()=> openLogin());
+menuLogoutBtn.addEventListener("click", async ()=>{
   await supabaseClient.auth.signOut();
   localStorage.removeItem("rememberMe");
-  loginBtn.style.display = "inline-block"; logoutBtn.style.display="none";
+  menuUser.textContent = "Não conectado"; menuUserEmail.textContent = "";
+  menuLogoutBtn.classList.add("hidden"); menuLoginBtn.classList.remove("hidden");
   alert("Deslogado");
-};
+});
 
 function openLogin(){ document.getElementById("loginMsg").textContent=""; loginModal.style.display="flex"; }
 function closeLogin(){ loginModal.style.display="none"; }
@@ -379,27 +461,32 @@ async function doLogin(){
   // login ok
   if(remember) localStorage.setItem("rememberMe","1");
   loginModal.style.display="none";
-  loginBtn.style.display="none"; logoutBtn.style.display="inline-block";
+  menuUser.textContent = (res.data.user.user_metadata && res.data.user.user_metadata.full_name) ? res.data.user.user_metadata.full_name : res.data.user.email;
+  menuUserEmail.textContent = res.data.user.email;
+  menuLoginBtn.classList.add("hidden"); menuLogoutBtn.classList.remove("hidden");
   alert("Logado com sucesso!");
 }
 
-/* tenta restaurar sessão */
+// restore session
 (async function restoreSession(){
-  // se usuário pediu lembrar, Supabase tende a persistir sessão automaticamente; aqui só atualizamos UI
   const s = await supabaseClient.auth.getSession();
-  if(s && s.data && s.data.session) { loginBtn.style.display="none"; logoutBtn.style.display="inline-block"; }
+  if(s && s.data && s.data.session){
+    const user = s.data.session.user;
+    menuUser.textContent = (user.user_metadata && user.user_metadata.full_name) ? user.user_metadata.full_name : user.email;
+    menuUserEmail.textContent = user.email;
+    menuLoginBtn.classList.add("hidden"); menuLogoutBtn.classList.remove("hidden");
+  }
 })();
 
-/* ---------------- MODO ESCURO ---------------- */
-const darkToggle = document.getElementById("darkToggle");
+/* -------------- MODO ESCURO -------------- */
+const darkToggle = document.getElementById("darkToggleMenu");
 darkToggle.addEventListener("change", ()=> {
   if(darkToggle.checked){ document.documentElement.classList.add("dark"); localStorage.setItem("dark","1"); }
   else { document.documentElement.classList.remove("dark"); localStorage.removeItem("dark"); }
 });
-/* restaurar preferência */
 if(localStorage.getItem("dark")){ darkToggle.checked=true; document.documentElement.classList.add("dark"); }
 
-/* ---------------- NOTIFICAÇÕES LOCAIS (quando site aberto) ---------------- */
+/* -------------- NOTIFICAÇÕES LOCAIS -------------- */
 async function requestNotificationPermission(){ 
   if(!("Notification" in window)) return false;
   if(Notification.permission === "granted") return true;
@@ -409,47 +496,27 @@ async function requestNotificationPermission(){
   }
   return false;
 }
-
-/* agenda lembretes locais (rodam somente enquanto a aba estiver aberta) */
 async function scheduleLocalReminders(){
-  if(!await requestNotificationPermission()) return;
-  // limpar timers simples (não implementamos cancelamento aqui; é uma demo)
+  if(!await requestNotificationPermission()) { alert("Permissão de notificações negada."); return; }
   const now = new Date();
   folgas.forEach(p=>{
     p.periodos.forEach(pr=>{
       const ini = parseDateTime(pr[0]);
       const fim = parseDateTime(pr[1]);
-      // notificar 12h antes de início
       const antesIni = new Date(ini.getTime() - 12*60*60*1000);
       if(antesIni > now){
         setTimeout(()=> new Notification(`${p.nome} entra em folga`, { body: `Começa em ${ini.toLocaleString("pt-BR")}` }), antesIni - now);
       }
-      // notificar 12h antes de fim (quando volta)
       const antesFim = new Date(fim.getTime() - 12*60*60*1000);
       if(antesFim > now){
         setTimeout(()=> new Notification(`${p.nome} volta da folga`, { body: `Volta em ${fim.toLocaleString("pt-BR")}` }), antesFim - now);
       }
     });
   });
+  alert("Lembretes locais agendados (quando a aba estiver aberta).");
 }
 
-/* ---------------- UTIL: carregar automático ao abrir ---------------- */
-async function initApp(){
-  gerarMesesNoSelect();
-  // tentar carregar do Supabase; se retornar false (vazio/erro), usa dados locais
-  const ok = await carregarFolgasDoBanco();
-  if(!ok){
-    gerarFolgasAte2026(); // usa dados locais como fallback
-    popularFuncionarios();
-    montarLista();
-  } else {
-    popularFuncionarios();
-  }
-  // agendar lembretes locais
-  scheduleLocalReminders().catch(()=>{});
-}
-
-/* ---------------- COPIAR / QUEM ESTÁ ---------------- */
+/* -------------- COPIAR / QUEM ESTÁ -------------- */
 function copiarFolgas(nome){
   const f = folgas.find(x=>x.nome===nome);
   const filtroMes = document.getElementById("mesSelect").value;
@@ -466,13 +533,102 @@ function mostrarFolgasAgora(){
   else alert("Em folga:\n" + em.map(x=>x.nome).join("\n"));
 }
 
-/* ---------------- EVENTOS UI ---------------- */
-document.getElementById("funcSelect").addEventListener("change", montarLista);
-document.getElementById("mesSelect").addEventListener("change", montarLista);
+/* -------------- GERAR PDF (jsPDF + autoTable) -------------- */
+async function gerarPDFFuncionarioMes(){
+  const func = document.getElementById("funcSelectMenu").value;
+  const mes = document.getElementById("mesSelectMenu").value;
+  if(func === "todos"){ alert("Escolha um funcionário no menu."); return; }
+  if(!mes || mes === "todos"){ alert("Escolha um mês/ano no menu."); return; }
+  const pessoa = folgas.find(f=>f.nome === func);
+  if(!pessoa){ alert("Funcionário não encontrado."); return; }
+  const rows = pessoa.periodos.filter(p=> p[0].startsWith(mes));
+  if(rows.length === 0){ alert("Sem folgas desse funcionário no mês selecionado."); return; }
 
-/* ---------------- INICIAR ---------------- */
+  // montar PDF
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // header
+  doc.setFontSize(14);
+  doc.text("Escala de Folgas", pageWidth/2, 40, { align: "center" });
+  doc.setFontSize(11);
+  doc.text(`Funcionário: ${pessoa.nome}`, 40, 70);
+  doc.text(`Mês/Ano: ${mes.slice(5,7)}/${mes.slice(0,4)}`, 40, 88);
+
+  // tabela: converter para autoTable rows
+  const tableBody = rows.map(r=>{
+    const ini = parseDateTime(r[0]), fim = parseDateTime(r[1]);
+    return [
+      ini.toLocaleDateString("pt-BR"),
+      `${ini.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})} → ${fim.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})}`,
+      `${r[0]} até ${r[1]}`
+    ];
+  });
+
+  // usar autoTable
+  doc.autoTable({
+    startY: 110,
+    head: [["Data", "Horário", "Período (valor texto)"]],
+    body: tableBody,
+    styles: { fontSize:10 },
+    headStyles: { fillColor: [41, 128, 185] }
+  });
+
+  // assinatura (em branco para você editar futuramente)
+  const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 40 : 300;
+  doc.setFontSize(11);
+  doc.text("Responsável Administrativo: ____________________________", 40, finalY + 20);
+  doc.text("(campo em branco para editar futuramente)", 42, finalY + 36);
+  doc.text(`Funcionário (${pessoa.nome}): ____________________________`, 40, finalY + 80);
+
+  // salvar
+  const nomeArquivo = `Escala_${pessoa.nome.replace(/\s+/g,'_')}_${mes}.pdf`;
+  doc.save(nomeArquivo);
+}
+
+/* -------------- MENU UI -------------- */
+const hamburgerBtn = document.getElementById("hamburgerBtn");
+const menu = document.getElementById("menuPopup");
+hamburgerBtn.addEventListener("click", ()=> { menu.style.display = (menu.style.display === "block") ? "none" : "block"; });
+window.addEventListener("click", (e)=> { if(!menu.contains(e.target) && e.target !== hamburgerBtn) menu.style.display = "none"; });
+
+/* sincronizar selects do menu com os selects da página principal */
+document.getElementById("funcSelectMenu").addEventListener("change", (e)=>{
+  document.getElementById("funcSelect").value = e.target.value; montarLista();
+});
+document.getElementById("mesSelectMenu").addEventListener("change", (e)=>{
+  document.getElementById("mesSelect").value = e.target.value; montarLista();
+});
+
+/* botões do menu */
+document.getElementById("gerarPdfBtn").addEventListener("click", gerarPDFFuncionarioMes);
+document.getElementById("menuLoginBtn").addEventListener("click", openLogin);
+document.getElementById("menuLogoutBtn").addEventListener("click", async ()=> {
+  await supabaseClient.auth.signOut(); menuUser.textContent = "Não conectado"; menuUserEmail.textContent = ""; menuLoginBtn.classList.remove("hidden"); menuLogoutBtn.classList.add("hidden");
+});
+
+/* -------------- INICIALIZAÇÃO -------------- */
+async function initApp(){
+  gerarMesesNoSelects();
+  popularFuncionariosTo('funcSelect');
+  popularFuncionariosTo('funcSelectMenu');
+  // tenta carregar do Supabase; se vazio/erro usa geração local
+  const ok = await carregarFolgasDoBanco();
+  if(!ok){
+    gerarFolgasAte2026();
+    popularFuncionariosTo('funcSelect');
+    popularFuncionariosTo('funcSelectMenu');
+    gerarMesesNoSelects();
+    montarLista();
+  }
+  // listeners principais
+  document.getElementById("funcSelect").addEventListener("change",(e)=> { document.getElementById("funcSelectMenu").value = e.target.value; montarLista(); });
+  document.getElementById("mesSelect").addEventListener("change",(e)=> { document.getElementById("mesSelectMenu").value = e.target.value; montarLista(); });
+  // init montagens
+  montarLista();
+}
 initApp();
 </script>
 </body>
 </html>
-
