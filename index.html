@@ -336,8 +336,8 @@ function montarLista(){
 }
 
 /* -------------- EDIÇÃO -------------- */
-function editar(nome){ folgas.find(f=>f.nome===nome).editindo = true; montarLista(); }
-function cancelarEdicao(nome){ folgas.find(f=>f.nome===nome).editindo = false; montarLista(); }
+function editar(nome){ folgas.find(f=>f.nome===nome).editando = true; montarLista(); }
+function cancelarEdicao(nome){ folgas.find(f=>f.nome===nome).editando = false; montarLista(); }
 function removerFolgaFiltrada(nome, idxFiltrado){
   const filtroMes = document.getElementById("mesSelect").value;
   const pessoa = folgas.find(f=>f.nome===nome);
