@@ -3,186 +3,745 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Escala de Folgas</title>
-
-<!-- jsPDF + autoTable (para gerar PDF no cliente) -->
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.min.js"></script>
+<title>Portal Operacional - Escala & Abastecimentos</title>
 
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
+<!-- jsPDF + autoTable -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.min.js"></script>
+
 <style>
   :root{
-    --bg:#eef1f5; --card:#fff; --text:#222; --muted:#666;
-    --accent:#007bff; --ok:#4caf50; --warn:#ffeb8a; --danger:#ffd2d2;
-    --warn-border:#f0d24c; --danger-border:#aa1f1f;
+    --primary:#1A73E8;
+    --primary-dark:#0F5AC6;
+    --primary-soft:#E9F1FF;
+    --bg:#F5F7FA;
+    --card:#FFFFFF;
+    --text:#1F2933;
+    --muted:#6B778C;
+    --border:#D0D7E2;
+    --ok:#1ABC9C;
+    --warn:#FFEB8A;
+    --danger:#FFD2D2;
+    --danger-border:#C0392B;
+    --warn-border:#F0D24C;
   }
   .dark{
-    --bg:#121212; --card:#1b1b1b; --text:#e6e6e6; --muted:#aaa; --accent:#5aa9ff;
-    --warn:#f4f7c4; --danger:#ffd2d2;
+    --bg:#0B0F19;
+    --card:#151B2B;
+    --text:#E6ECFF;
+    --muted:#9FA6B2;
+    --border:#2E3A59;
+    --primary-soft:#16213D;
   }
-  body { font-family: Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; padding:20px; }
-  h2 { text-align:center; margin-bottom:12px; }
-  .controls { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
-  select, button { padding:10px; font-size:14px; border-radius:8px; border:1px solid #bbb; cursor:pointer; background:var(--card); color:var(--text); }
-  button.primary { background:var(--accent); color:white; border:none; }
-  button.green { background:var(--ok); color:white; border:none; }
-  button.orange { background:var(--warn); color:black; border:none; }
-  button.red { background:var(--danger); color:black; border:none; }
-  .pessoa { background:var(--card); padding:14px; margin-bottom:16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
-  /* highlight areas: ensure text remains legível in dark mode by forcing black text on warn/danger backgrounds */
-  .em-folga { background:var(--danger) !important; border-left:6px solid var(--danger-border); color:black; }
-  .em-folga * { color:black !important; }
-  .entra-hoje { background:var(--warn) !important; border-left:6px solid var(--warn-border); color:black; }
-  .entra-hoje * { color:black !important; }
-  .titulo { font-size:18px; font-weight:700; margin-bottom:8px; }
-  .folga-item { padding:6px 0; }
-  .data { font-weight:700; color:var(--text); }
-  .hora { color:var(--muted); }
-  hr { border:none; border-bottom:1px solid rgba(0,0,0,0.08); margin:8px 0; }
 
-  /* login modal */
-  .modal { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); z-index:9999; }
-  .card { background:var(--card); padding:18px; border-radius:12px; width:320px; box-shadow:0 8px 30px rgba(0,0,0,0.3); color:var(--text); }
-  input[type="email"], input[type="password"], input[type="text"]{ width:100%; padding:8px; margin:6px 0 12px; border-radius:6px; border:1px solid #ccc; background:transparent; color:var(--text); }
-
-  /* floating menu (hamburger popup) */
-  .hamburger {
-    position:fixed; left:12px; top:16px; z-index:1000;
-    width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center;
-    background:var(--card); box-shadow:0 6px 18px rgba(0,0,0,0.12); cursor:pointer; border:1px solid #ccc;
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
   }
-  .hamburger:hover{ transform:translateY(-2px); transition:0.12s; }
 
-  .menuPopup {
-    position:fixed; left:12px; top:70px; z-index:1000; width:300px; border-radius:10px;
-    background:var(--card); box-shadow:0 10px 30px rgba(0,0,0,0.18); padding:12px; display:none;
+  /* ---------- TOP NAVBAR ---------- */
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:1000;
+    background:var(--primary);
+    color:#fff;
+    box-shadow:0 4px 14px rgba(0,0,0,0.16);
   }
-  .menuPopup .row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-  .menuPopup label{ font-size:13px; color:var(--muted); }
-  .menuPopup .spaced{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .topbar-inner{
+    max-width:1100px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:8px 14px;
+    gap:10px;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-weight:700;
+    font-size:17px;
+  }
+  .brand-icon{
+    width:30px;
+    height:30px;
+    border-radius:10px;
+    background:rgba(255,255,255,0.15);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:16px;
+  }
+  .tabs{
+    display:flex;
+    gap:4px;
+    background:rgba(0,0,0,0.08);
+    padding:3px;
+    border-radius:999px;
+    overflow-x:auto;
+  }
+  .tab-btn{
+    border:none;
+    padding:6px 14px;
+    border-radius:999px;
+    font-size:13px;
+    color:#E2ECFF;
+    background:transparent;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .tab-btn.active{
+    background:#fff;
+    color:var(--primary);
+    font-weight:600;
+    box-shadow:0 2px 6px rgba(0,0,0,0.18);
+  }
 
-  /* small helpers */
-  .small { font-size:13px; color:var(--muted); }
-  .hidden { display:none !important; }
+  .topbar-right{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+  }
+  .user-pill{
+    padding:4px 10px;
+    border-radius:999px;
+    background:rgba(0,0,0,0.16);
+    max-width:130px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  button, select, input{
+    font-family:inherit;
+  }
+  .btn{
+    border-radius:8px;
+    border:1px solid var(--border);
+    padding:7px 12px;
+    font-size:13px;
+    cursor:pointer;
+    background:var(--card);
+    color:var(--text);
+  }
+  .btn-primary{
+    background:#fff;
+    color:var(--primary);
+    border:none;
+    font-weight:600;
+  }
+  .btn-outline-light{
+    background:transparent;
+    color:#fff;
+    border:1px solid rgba(255,255,255,0.6);
+  }
 
-  /* responsive */
-  @media(max-width:560px){
-    .menuPopup { width:92%; left:4%; top:68px; }
+  /* dark mode toggle (switch) */
+  .switch{
+    position:relative;
+    display:inline-block;
+    width:40px;
+    height:20px;
+  }
+  .switch input{display:none;}
+  .slider{
+    position:absolute;
+    cursor:pointer;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.35);
+    transition:.2s;
+    border-radius:999px;
+  }
+  .slider:before{
+    position:absolute;
+    content:"";
+    height:16px;width:16px;
+    left:2px;bottom:2px;
+    background:white;
+    transition:.2s;
+    border-radius:50%;
+  }
+  input:checked + .slider{
+    background:rgba(255,255,255,0.75);
+  }
+  input:checked + .slider:before{
+    transform:translateX(20px);
+  }
+
+  /* ---------- LAYOUT GERAL ---------- */
+  .page{
+    max-width:1100px;
+    margin:0 auto;
+    padding:16px 14px 24px;
+  }
+  h2{
+    margin:8px 0 14px;
+    font-size:20px;
+  }
+  .card{
+    background:var(--card);
+    border-radius:12px;
+    padding:16px;
+    box-shadow:0 10px 30px rgba(15,23,42,0.12);
+    border:1px solid var(--border);
+  }
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .controls select,.controls button{
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:13px;
+    background:var(--card);
+    color:var(--text);
+  }
+  .controls button.primary{
+    background:var(--primary);
+    color:#fff;
+    border:none;
+  }
+
+  .small{ font-size:12px;color:var(--muted); }
+
+  /* ---------- ESCALA ---------- */
+  .pessoa{
+    background:var(--card);
+    padding:12px;
+    margin-bottom:12px;
+    border-radius:10px;
+    border:1px solid var(--border);
+  }
+  .em-folga{
+    background:var(--danger)!important;
+    border-left:6px solid var(--danger-border);
+    color:black;
+  }
+  .em-folga *{ color:black!important; }
+  .entra-hoje{
+    background:var(--warn)!important;
+    border-left:6px solid var(--warn-border);
+    color:black;
+  }
+  .entra-hoje *{ color:black!important; }
+  .titulo{
+    font-weight:600;
+    margin-bottom:6px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+  }
+  .titulo span.nome{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .pessoa-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:6px;
+  }
+  .folga-item{ padding:4px 0; }
+  .data{ font-weight:600; }
+  .hora{ color:var(--muted); font-size:13px; }
+  hr{ border:none; border-bottom:1px solid rgba(0,0,0,0.06); margin:6px 0; }
+
+  input[type="date"],input[type="time"],input[type="number"],input[type="text"],input[type="email"],input[type="password"],select{
+    padding:7px 8px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--text);
+    font-size:13px;
+    width:100%;
+  }
+
+  /* ---------- ABAS / SPA ---------- */
+  .tab-view{ display:none; }
+  .tab-view.active{ display:block; }
+
+  /* ---------- LOGIN MODAL ---------- */
+  .modal{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(15,23,42,0.55);
+    z-index:2000;
+  }
+  .modal-card{
+    width:100%;
+    max-width:360px;
+    background:var(--card);
+    border-radius:16px;
+    padding:20px 18px;
+    box-shadow:0 20px 60px rgba(15,23,42,0.45);
+    border:1px solid var(--border);
+  }
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .modal-header h3{
+    margin:0;
+    font-size:18px;
+  }
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:11px;
+    padding:3px 8px;
+    border-radius:999px;
+    background:var(--primary-soft);
+    color:var(--primary-dark);
+  }
+
+  /* ---------- FORM GRID ---------- */
+  .form-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .form-col{
+    flex:1;
+    min-width:120px;
+  }
+  label{ font-size:12px; color:var(--muted); display:block; margin-bottom:2px; }
+
+  /* ---------- TABLE ---------- */
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+  }
+  th,td{
+    padding:6px 8px;
+    border-bottom:1px solid var(--border);
+    text-align:left;
+    white-space:nowrap;
+  }
+  th{
+    background:var(--primary-soft);
+    font-weight:600;
+  }
+  tbody tr:hover{
+    background:rgba(0,0,0,0.03);
+  }
+
+  .table-wrapper{
+    overflow:auto;
+    max-height:340px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:var(--card);
+  }
+
+  /* ---------- TOAST ---------- */
+  .toast{
+    position:fixed;
+    bottom:16px;
+    right:16px;
+    background:var(--card);
+    color:var(--text);
+    padding:10px 14px;
+    border-radius:10px;
+    box-shadow:0 12px 30px rgba(15,23,42,0.3);
+    font-size:13px;
+    border:1px solid var(--border);
+    opacity:0;
+    transform:translateY(10px);
+    pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    z-index:3000;
+  }
+  .toast.show{
+    opacity:1;
+    transform:translateY(0);
+    pointer-events:auto;
+  }
+
+  .badge-auth{
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    background:rgba(255,255,255,0.18);
+    border:1px solid rgba(255,255,255,0.4);
+  }
+
+  /* auth disabled */
+  .disabled-info{
+    padding:8px 10px;
+    border-radius:10px;
+    background:var(--primary-soft);
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:10px;
+  }
+  .btn[disabled],button[disabled]{
+    opacity:0.6;
+    cursor:not-allowed;
+  }
+
+  /* ---------- RESPONSIVO ---------- */
+  @media(max-width:720px){
+    .topbar-inner{
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:6px;
+    }
+    .tabs{
+      order:3;
+      width:100%;
+      justify-content:flex-start;
+    }
+    .topbar-right{
+      order:2;
+    }
+    .page{
+      padding:12px 10px 20px;
+    }
   }
 </style>
 </head>
 <body>
 
-<!-- hamburger button -->
-<div class="hamburger" id="hamburgerBtn" title="Menu ☰">☰</div>
-
-<!-- menu popup -->
-<div class="menuPopup" id="menuPopup" aria-hidden="true">
-  <div class="row spaced">
-    <div>
-      <div id="menuUser" style="font-weight:700">Não conectado</div>
-      <div class="small" id="menuUserEmail"></div>
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-icon">🚚</div>
+      <div>
+        <div>Portal Operacional</div>
+        <div style="font-size:11px;opacity:0.8;">Escala & Abastecimentos</div>
+      </div>
     </div>
-    <div>
-      <button id="menuLoginBtn" class="primary small">Login</button>
-      <button id="menuLogoutBtn" class="small hidden">Logout</button>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="escala">Escala</button>
+      <button class="tab-btn" data-tab="abastecimento">Abastecimento</button>
+      <button class="tab-btn" data-tab="motoristas">Motoristas</button>
+      <button class="tab-btn" data-tab="placas">Placas</button>
+    </nav>
+
+    <div class="topbar-right">
+      <span class="badge-auth" id="authBadge">Apenas leitura</span>
+      <label class="switch" title="Modo escuro">
+        <input type="checkbox" id="darkToggle">
+        <span class="slider"></span>
+      </label>
+      <div class="user-pill" id="userPill">Visitante</div>
+      <button class="btn-outline-light" id="loginBtnTop">Login</button>
+      <button class="btn-outline-light" id="logoutBtnTop" style="display:none;">Sair</button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- MODAL LOGIN -->
+  <div class="modal" id="loginModal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Entrar no sistema</h3>
+        <button class="btn" style="padding:4px 8px;font-size:11px;" onclick="closeLogin()">Fechar</button>
+      </div>
+      <div class="chip">
+        <span>🔐 Acesso restrito</span>
+        <span style="opacity:0.8;">Área de edição</span>
+      </div>
+      <p class="small" style="margin-top:8px;">
+        Use seu email e senha cadastrados no Supabase Auth.
+      </p>
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="voce@empresa.com" />
+      <label>Senha</label>
+      <input type="password" id="loginPass" placeholder="••••••••" />
+      <label style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+        <input type="checkbox" id="rememberMe" />
+        <span class="small">Lembrar de mim neste dispositivo</span>
+      </label>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn-primary" style="flex:1;" onclick="doLogin()">Entrar</button>
+        <button class="btn" style="flex:1;" onclick="closeLogin()">Cancelar</button>
+      </div>
+      <div id="loginMsg" class="small" style="margin-top:8px;color:#e53935;"></div>
     </div>
   </div>
 
-  <hr>
+  <!-- TAB: ESCALA -->
+  <section id="tab-escala" class="tab-view active">
+    <h2>Escala de Folgas</h2>
 
-  <div class="row">
-    <button class="small" onclick="carregarFolgasDoBanco()">Carregar da Nuvem</button>
-    <button class="small" onclick="salvarTodasNoBanco()">Salvar na Nuvem</button>
-  </div>
+    <div class="card">
+      <div class="controls">
+        <div style="flex:1;min-width:150px;">
+          <label>Funcionário</label>
+          <select id="funcSelect">
+            <option value="todos">Todos os funcionários</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:150px;">
+          <label>Mês / Ano</label>
+          <select id="mesSelect">
+            <option value="todos">Todos os meses</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:160px;">
+          <button class="btn-primary" onclick="mostrarFolgasAgora()">Quem está de folga agora?</button>
+          <button class="btn" onclick="scheduleLocalReminders()">🔔 Lembretes 12h (local)</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:160px;">
+          <button class="btn" onclick="carregarFolgasDoBanco()">⭮ Carregar da nuvem</button>
+          <button class="btn needs-auth" onclick="salvarTodasNoBanco()" disabled>💾 Salvar na nuvem</button>
+        </div>
+      </div>
+      <div class="small" style="margin-bottom:10px;">
+        <b>Observação:</b> Edição de folgas e salvamento na nuvem exigem login.
+      </div>
 
-  <div style="height:8px"></div>
-
-  <div class="row">
-    <label><input type="checkbox" id="darkToggleMenu"> Modo escuro</label>
-  </div>
-
-  <div style="height:6px"></div>
-
-  <div class="row">
-    <label style="width:100%">Funcionário</label>
-    <select id="funcSelectMenu" style="width:100%"></select>
-  </div>
-
-  <div class="row">
-    <label style="width:100%">Mês / Ano</label>
-    <select id="mesSelectMenu" style="width:100%"></select>
-  </div>
-
-  <div style="height:8px"></div>
-
-  <div class="row">
-    <button class="primary" id="gerarPdfBtn">Gerar PDF (func./mês)</button>
-  </div>
-
-  <div style="height:8px"></div>
-
-  <div class="small">Obs: notificações 12h só funcionam enquanto a aba estiver aberta.</div>
-</div>
-
-<!-- login modal -->
-<div id="loginModal" class="modal" style="display:none;">
-  <div class="card">
-    <h3>Entrar</h3>
-    <div class="small">Use o usuário do Supabase (email e senha).</div>
-    <input id="loginEmail" type="email" placeholder="Email" />
-    <input id="loginPass" type="password" placeholder="Senha" />
-    <label><input id="rememberMe" type="checkbox" /> Lembrar de mim</label>
-    <div style="display:flex;gap:8px;margin-top:12px;">
-      <button class="primary" onclick="doLogin()">Entrar</button>
-      <button onclick="closeLogin()">Fechar</button>
+      <div id="lista"></div>
     </div>
-    <div id="loginMsg" class="small" style="margin-top:8px;color:crimson;"></div>
-  </div>
-</div>
+  </section>
 
-<h2>Escala de Folgas</h2>
+  <!-- TAB: ABASTECIMENTO -->
+  <section id="tab-abastecimento" class="tab-view">
+    <h2>Abastecimentos</h2>
 
-<div class="controls">
-    <select id="funcSelect"><option value="todos">Todos Funcionários</option></select>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="disabled-info">
+        Para <b>registrar abastecimentos, editar registros e gerar PDFs</b> é necessário estar logado.
+      </div>
 
-    <select id="mesSelect">
-        <option value="todos">Todos os meses</option>
-    </select>
+      <!-- FORM CADASTRO -->
+      <h3 style="margin-top:0;font-size:16px;">Novo abastecimento</h3>
+      <div class="form-row">
+        <div class="form-col">
+          <label>Data</label>
+          <input type="date" id="abastData">
+        </div>
+        <div class="form-col">
+          <label>Placa</label>
+          <select id="abastPlaca"></select>
+        </div>
+        <div class="form-col">
+          <label>Motorista</label>
+          <select id="abastMotorista"></select>
+        </div>
+        <div class="form-col">
+          <label>Combustível</label>
+          <select id="abastComb">
+            <option value="">Selecione...</option>
+            <option>Diesel</option>
+            <option>Gasolina</option>
+            <option>Etanol</option>
+            <option>Arla 32</option>
+          </select>
+        </div>
+      </div>
 
-    <button class="primary" onclick="mostrarFolgasAgora()">Quem está de folga agora?</button>
-    <button class="small" onclick="scheduleLocalReminders()">Agendar notificações (local)</button>
-</div>
+      <div class="form-row">
+        <div class="form-col">
+          <label>Km anterior</label>
+          <input type="number" step="0.1" id="abastKmAnt">
+        </div>
+        <div class="form-col">
+          <label>Km atual</label>
+          <input type="number" step="0.1" id="abastKmAtual">
+        </div>
+        <div class="form-col">
+          <label>Litros</label>
+          <input type="number" step="0.01" id="abastLitros">
+        </div>
+        <div class="form-col">
+          <label>Valor por litro (R$)</label>
+          <input type="number" step="0.01" id="abastVlrLitro">
+        </div>
+      </div>
 
-<div id="lista"></div>
+      <div class="form-row">
+        <div class="form-col">
+          <label>Total (R$)</label>
+          <input type="text" id="abastTotal" readonly>
+        </div>
+        <div class="form-col">
+          <label>Média (km/l)</label>
+          <input type="text" id="abastMedia" readonly>
+        </div>
+        <div class="form-col" style="display:flex;align-items:flex-end;">
+          <button class="btn-primary needs-auth" style="width:100%;" onclick="salvarAbastecimento()" disabled>
+            💾 Salvar abastecimento
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <!-- FILTROS -->
+      <div class="form-row">
+        <div class="form-col">
+          <label>Filtrar por placa</label>
+          <select id="filtroPlaca">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="form-col">
+          <label>Filtrar por motorista</label>
+          <select id="filtroMotorista">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="form-col">
+          <label>Mês</label>
+          <select id="filtroMes">
+            <option value="">Todos</option>
+            <option value="01">01</option><option value="02">02</option>
+            <option value="03">03</option><option value="04">04</option>
+            <option value="05">05</option><option value="06">06</option>
+            <option value="07">07</option><option value="08">08</option>
+            <option value="09">09</option><option value="10">10</option>
+            <option value="11">11</option><option value="12">12</option>
+          </select>
+        </div>
+        <div class="form-col">
+          <label>Ano</label>
+          <select id="filtroAno">
+            <option value="">Todos</option>
+            <script>
+              // preenchido abaixo via JS para não quebrar block
+            </script>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px;">
+        <div class="form-col" style="max-width:220px;">
+          <button class="btn" style="width:100%;" onclick="carregarAbastecimentos()">⭮ Atualizar lista</button>
+        </div>
+        <div class="form-col" style="max-width:220px;">
+          <button class="btn needs-auth" style="width:100%;" onclick="gerarPDFAbastecimentos()" disabled>
+            📄 Gerar PDF (filtro)
+          </button>
+        </div>
+      </div>
+
+      <!-- TABELA -->
+      <div class="table-wrapper">
+        <table id="tabelaAbastecimentos">
+          <thead>
+            <tr>
+              <th>Data</th><th>Placa</th><th>Motorista</th><th>Comb.</th>
+              <th>Km ant</th><th>Km atual</th><th>Litros</th>
+              <th>R$/L</th><th>Total</th><th>Média</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="small" id="resumoAbast" style="margin-top:8px;"></div>
+    </div>
+  </section>
+
+  <!-- TAB: MOTORISTAS -->
+  <section id="tab-motoristas" class="tab-view">
+    <h2>Motoristas</h2>
+    <div class="card">
+      <div class="disabled-info">
+        Gestão de motoristas exige login. Sem login, a lista é apenas para consulta.
+      </div>
+      <div class="form-row">
+        <div class="form-col">
+          <label>Novo motorista</label>
+          <input type="text" id="novoMotoristaNome" placeholder="Nome completo" />
+        </div>
+        <div class="form-col" style="max-width:150px;display:flex;align-items:flex-end;">
+          <button class="btn needs-auth" style="width:100%;" onclick="adicionarMotorista()" disabled>
+            ➕ Adicionar
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrapper" style="margin-top:10px;max-height:280px;">
+        <table id="tabelaMotoristas">
+          <thead>
+            <tr>
+              <th>Nome</th><th>Status</th><th>Ação</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: PLACAS -->
+  <section id="tab-placas" class="tab-view">
+    <h2>Placas</h2>
+    <div class="card">
+      <div class="disabled-info">
+        Gestão de placas exige login. Sem login, a lista é somente leitura.
+      </div>
+      <div class="form-row">
+        <div class="form-col">
+          <label>Nova placa</label>
+          <input type="text" id="novaPlacaValor" placeholder="ABC-1D23" />
+        </div>
+        <div class="form-col">
+          <label>Descrição (opcional)</label>
+          <input type="text" id="novaPlacaDescricao" placeholder="Caminhão toco, guincho, etc." />
+        </div>
+        <div class="form-col" style="max-width:150px;display:flex;align-items:flex-end;">
+          <button class="btn needs-auth" style="width:100%;" onclick="adicionarPlaca()" disabled>
+            ➕ Adicionar
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrapper" style="margin-top:10px;max-height:280px;">
+        <table id="tabelaPlacas">
+          <thead>
+            <tr>
+              <th>Placa</th><th>Descrição</th><th>Status</th><th>Ação</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
 
 <script>
-/* -------------- CONFIG SUPABASE -------------- */
+/* ============ CONFIG SUPABASE ============ */
 const SUPABASE_URL = "https://gaqazvekgpvecuhfuiel.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcWF6dmVrZ3B2ZWN1aGZ1aWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MDc1NDQsImV4cCI6MjA4MDQ4MzU0NH0.crmOSloZVI0CMuJkIBLfOI6yKiT8dmEa10xrQnFBIcM";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* -------------- HELPERS -------------- */
-function pad2(n){ return n.toString().padStart(2,"0"); }
-function parseDateTime(str){
-  if(!str) return new Date(0);
-  if(str.includes("T") || str.includes("Z")){
-    const d = new Date(str);
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
-  }
-  const [d,t] = String(str).split(" ");
-  const [Y,M,D] = d.split("-").map(Number);
-  const [h,m] = (t||"00:00").split(":").map(Number);
-  return new Date(Y, M-1, D, h, m);
-}
-function formatDateTime(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`; }
-function formatDateInput(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`; }
-function formatTimeInput(dt){ return `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`; }
-
-/* -------------- DADOS INICIAIS (fallback) -------------- */
-const folgas = [
+/* ============ ESTADO GLOBAL ============ */
+let currentUser = null;
+let folgas = [
+  // fallback (usado se banco vier vazio / erro)
   { nome:"Anderson Saraiva Serrano", editando:false, periodos:[
     ["2025-12-02 07:00","2025-12-03 19:00"],
     ["2025-12-10 19:00","2025-12-12 07:00"],
@@ -209,164 +768,316 @@ const folgas = [
     ["2025-12-17 19:00","2025-12-19 07:00"],
     ["2025-12-26 07:00","2025-12-27 19:00"]
   ]},
-  { nome:"Vanderlei", editando:false, periodos:[]}
+  { nome:"Vanderlei", editando:false, periodos:[] }
 ];
-folgas[5] && (folgas[5].periodos = folgas[3].periodos ? JSON.parse(JSON.stringify(folgas[3].periodos)) : []);
 
-/* -------------- POPULAR SELECTS -------------- */
-function popularFuncionariosTo(selId){
-  const sel = document.getElementById(selId);
-  sel.innerHTML = '<option value="todos">Todos Funcionários</option>';
-  folgas.forEach(f => {
-    const o = document.createElement("option"); o.value = f.nome; o.textContent = f.nome; sel.appendChild(o);
+/* ============ HELPERS GERAIS ============ */
+function pad2(n){ return n.toString().padStart(2,"0"); }
+
+function parseDateTime(str){
+  if(!str) return new Date(0);
+  str = String(str);
+  if(str.includes("T") || str.includes("Z")){
+    const d = new Date(str);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
+  }
+  const [d,t] = str.split(" ");
+  const [Y,M,D] = d.split("-").map(Number);
+  const [h,m] = (t||"00:00").split(":").map(Number);
+  return new Date(Y, M-1, D, h, m);
+}
+function formatDateTime(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`; }
+
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(()=> t.classList.remove("show"), 2600);
+}
+
+function ensureAuth(msg){
+  if(!currentUser){
+    alert(msg || "Você precisa estar logado para fazer isso.");
+    openLogin();
+    return false;
+  }
+  return true;
+}
+
+function updateAuthUI(){
+  const badge = document.getElementById("authBadge");
+  const userPill = document.getElementById("userPill");
+  const loginBtn = document.getElementById("loginBtnTop");
+  const logoutBtn = document.getElementById("logoutBtnTop");
+  const needsAuthButtons = document.querySelectorAll(".needs-auth");
+
+  if(currentUser){
+    badge.textContent = "Edição habilitada";
+    badge.style.background = "rgba(0,0,0,0.15)";
+    badge.style.color = "#fff";
+    userPill.textContent = currentUser.email || "Usuário";
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+    needsAuthButtons.forEach(b=> b.disabled = false);
+  } else {
+    badge.textContent = "Apenas leitura";
+    badge.style.background = "rgba(0,0,0,0.18)";
+    badge.style.color = "#fff";
+    userPill.textContent = "Visitante";
+    loginBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+    needsAuthButtons.forEach(b=> b.disabled = true);
+  }
+}
+
+/* ============ LOGIN / SESSÃO ============ */
+const loginModal = document.getElementById("loginModal");
+function openLogin(){
+  document.getElementById("loginMsg").textContent = "";
+  loginModal.style.display = "flex";
+}
+function closeLogin(){
+  loginModal.style.display = "none";
+}
+
+async function doLogin(){
+  const email = document.getElementById("loginEmail").value.trim();
+  const pass = document.getElementById("loginPass").value;
+  const remember = document.getElementById("rememberMe").checked;
+  const msg = document.getElementById("loginMsg");
+  if(!email || !pass){
+    msg.textContent = "Preencha email e senha.";
+    return;
+  }
+  msg.textContent = "Entrando...";
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+  if(error){
+    msg.textContent = error.message;
+    return;
+  }
+  if(remember) localStorage.setItem("rememberMe","1");
+  currentUser = data.user;
+  updateAuthUI();
+  closeLogin();
+  showToast("Login realizado com sucesso.");
+}
+
+/* tenta restaurar sessão ao carregar */
+(async function restoreSession(){
+  const { data } = await supabaseClient.auth.getSession();
+  if(data && data.session){
+    currentUser = data.session.user;
+  }
+  updateAuthUI();
+})();
+
+document.getElementById("loginBtnTop").addEventListener("click", openLogin);
+document.getElementById("logoutBtnTop").addEventListener("click", async ()=>{
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  localStorage.removeItem("rememberMe");
+  updateAuthUI();
+  showToast("Você saiu do sistema.");
+});
+
+/* ============ MODO ESCURO ============ */
+const darkToggle = document.getElementById("darkToggle");
+darkToggle.addEventListener("change", ()=>{
+  if(darkToggle.checked){
+    document.documentElement.classList.add("dark");
+    localStorage.setItem("dark","1");
+  } else {
+    document.documentElement.classList.remove("dark");
+    localStorage.removeItem("dark");
+  }
+});
+if(localStorage.getItem("dark")){
+  darkToggle.checked = true;
+  document.documentElement.classList.add("dark");
+}
+
+/* ============ TABS SPA ============ */
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-view").forEach(v=>v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-"+btn.dataset.tab).classList.add("active");
+  });
+});
+
+/* ============ ESCALA ============ */
+function popularFuncionariosEscala(){
+  const sel = document.getElementById("funcSelect");
+  sel.innerHTML = '<option value="todos">Todos os funcionários</option>';
+  folgas.forEach(f=>{
+    const o = document.createElement("option");
+    o.value = f.nome; o.textContent = f.nome;
+    sel.appendChild(o);
   });
 }
-function gerarMesesNoSelects(){
-  const selMain = document.getElementById("mesSelect");
-  const selMenu = document.getElementById("mesSelectMenu");
-  selMain.innerHTML = '<option value="todos">Todos os meses</option>';
-  selMenu.innerHTML = '<option value="todos">Todos os meses</option>';
+function gerarMesesEscala(){
+  const sel = document.getElementById("mesSelect");
+  sel.innerHTML = '<option value="todos">Todos os meses</option>';
   const hoje = new Date();
-  const primeiroAno = 2025, primeiroMes = 12; // não mostrar meses ANTES de 2025-12
-  const start = new Date(Math.max(new Date(primeiroAno, primeiroMes-1,1).getTime(), new Date(hoje.getFullYear(), hoje.getMonth(),1).getTime()));
+  const primeiroAno = 2025, primeiroMes = 12;
+  const start = new Date(Math.max(
+    new Date(primeiroAno, primeiroMes-1,1).getTime(),
+    new Date(hoje.getFullYear(), hoje.getMonth(),1).getTime()
+  ));
   const anoStart = start.getFullYear(), mesStart = start.getMonth()+1;
-  for(let ano=anoStart; ano<=2026; ano++){
+  for(let ano = anoStart; ano <= 2026; ano++){
     for(let mes = (ano===anoStart?mesStart:1); mes<=12; mes++){
       const v = `${ano}-${pad2(mes)}`;
       const nome = new Date(ano, mes-1,1).toLocaleDateString("pt-BR",{month:"long"});
-      const o1 = document.createElement("option"); o1.value = v; o1.textContent = `${nome} ${ano}`; selMain.appendChild(o1);
-      const o2 = document.createElement("option"); o2.value = v; o2.textContent = `${nome} ${ano}`; selMenu.appendChild(o2);
+      const o = document.createElement("option");
+      o.value = v; o.textContent = `${nome} ${ano}`;
+      sel.appendChild(o);
     }
   }
-  // selecionar mês atual ou 2025-12 (mínimo)
   const atual = `${(new Date()).getFullYear()}-${pad2((new Date()).getMonth()+1)}`;
-  const min = `2025-12`;
-  const selVal = (atual < min ? min : atual);
-  selMain.value = selVal; selMenu.value = selVal;
+  const min = "2025-12";
+  sel.value = (atual < min ? min : atual);
 }
 
-/* -------------- REGRAS E GERAÇÃO (fallback) -------------- */
-function gerarFolgasAte2026(){
-  const limite = new Date(2026,11,31,23,59);
-  folgas.forEach(pessoa => {
-    if(!pessoa.periodos || pessoa.periodos.length===0) return;
-    let ultFim = parseDateTime(pessoa.periodos[pessoa.periodos.length-1][1]);
-    while(true){
-      let inicio;
-      if(ultFim.getDay() === 1){
-        inicio = new Date(ultFim); inicio.setDate(inicio.getDate()+1); inicio.setHours(7,0,0,0);
-      } else {
-        inicio = new Date(ultFim.getTime() + 7*24*60*60*1000);
-        if(inicio.getDay() === 1){ inicio.setDate(inicio.getDate()+1); inicio.setHours(7,0,0,0); }
-      }
-      if(inicio > limite) break;
-      const fim = new Date(inicio.getTime() + 36*60*60*1000);
-      pessoa.periodos.push([ formatDateTime(inicio), formatDateTime(fim) ]);
-      ultFim = fim;
-    }
-  });
-  // sincronizar Rafael/Vanderlei
-  const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
-  if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
-}
-
-/* -------------- ESTA DE FOLGA -------------- */
 function estaDeFolga(periodos){
   const agora = new Date();
-  return periodos.some(([ini,fim]) => {
+  return periodos.some(([ini,fim])=>{
     const a = parseDateTime(ini), b = parseDateTime(fim);
     return agora >= a && agora <= b;
   });
 }
 
-/* -------------- MONTAR LISTA -------------- */
 function montarLista(){
   const filtroFunc = document.getElementById("funcSelect").value;
-  const filtroMes = document.getElementById("mesSelect").value;
-  const lista = document.getElementById("lista"); lista.innerHTML = "";
+  const filtroMes  = document.getElementById("mesSelect").value;
+  const lista = document.getElementById("lista");
+  lista.innerHTML = "";
 
-  folgas.forEach(pessoa => {
+  folgas.forEach(pessoa=>{
     if(filtroFunc !== "todos" && pessoa.nome !== filtroFunc) return;
+    const periodosFiltrados = pessoa.periodos.filter(p=> filtroMes==="todos" || p[0].startsWith(filtroMes));
+    if(periodosFiltrados.length===0) return;
 
-    // filtra apenas períodos do mês selecionado
-    const mostrar = pessoa.periodos.filter(p => filtroMes === "todos" || p[0].startsWith(filtroMes));
-    if(mostrar.length === 0) return;
+    const div = document.createElement("div");
+    div.className = "pessoa";
 
-    const div = document.createElement("div"); div.classList.add("pessoa");
     if(estaDeFolga(pessoa.periodos)) div.classList.add("em-folga");
-    // destacar quem entra hoje à noite (ex: inicia no dia atual com hora >= 18)
     const hoje = new Date();
     const prefixHoje = `${hoje.getFullYear()}-${pad2(hoje.getMonth()+1)}-${pad2(hoje.getDate())}`;
-    if(mostrar.some(p => p[0].startsWith(prefixHoje) && parseDateTime(p[0]).getHours() >= 18)) div.classList.add("entra-hoje");
+    if(periodosFiltrados.some(p=> p[0].startsWith(prefixHoje) && parseDateTime(p[0]).getHours()>=18)){
+      div.classList.add("entra-hoje");
+    }
+
+    const titulo = document.createElement("div");
+    titulo.className = "titulo";
+    const spanNome = document.createElement("span");
+    spanNome.className = "nome";
+    spanNome.textContent = pessoa.nome;
+    titulo.appendChild(spanNome);
+
+    const pessoaActions = document.createElement("div");
+    pessoaActions.className = "pessoa-actions";
+    const btnCopiar = document.createElement("button");
+    btnCopiar.className = "btn";
+    btnCopiar.textContent = "📋 Copiar";
+    btnCopiar.onclick = ()=> copiarFolgas(pessoa.nome);
+    const btnEditar = document.createElement("button");
+    btnEditar.className = "btn needs-auth";
+    btnEditar.textContent = "✏ Editar";
+    btnEditar.disabled = !currentUser;
+    btnEditar.onclick = ()=> { if(ensureAuth("Você precisa estar logado para editar folgas.")) editar(pessoa.nome); };
+
+    pessoaActions.appendChild(btnCopiar);
+    pessoaActions.appendChild(btnEditar);
+    titulo.appendChild(pessoaActions);
+    div.appendChild(titulo);
 
     if(pessoa.editando){
       const nomeID = pessoa.nome.replace(/\s+/g,"_");
-      div.innerHTML = `<div class="titulo">${pessoa.nome}</div>` +
-        mostrar.map((p,i)=> {
-          const ini = parseDateTime(p[0]), fim = parseDateTime(p[1]);
-          return `<div style="background:#eee;padding:10px;margin-bottom:10px;border-radius:8px;">
-            <b>Período ${i+1}</b><br><br>
-            Início:<br>
-            <input type="date" id="iniData_${nomeID}_${i}" value="${formatDateInput(ini)}"><br>
-            <input type="time" id="iniHora_${nomeID}_${i}" value="${formatTimeInput(ini)}"><br><br>
-            Fim:<br>
-            <input type="date" id="fimData_${nomeID}_${i}" value="${formatDateInput(fim)}"><br>
-            <input type="time" id="fimHora_${nomeID}_${i}" value="${formatTimeInput(fim)}"><br><br>
-            <button class="red" onclick="removerFolgaFiltrada('${pessoa.nome}',${i})">🗑 Remover</button>
-          </div>`;
-        }).join("") +
-        `<button class="primary" onclick="adicionarFolga('${pessoa.nome}')">➕ Adicionar</button>
-         <button class="green" onclick="salvarEdicao('${pessoa.nome}')">Salvar</button>
-         <button class="red" onclick="cancelarEdicao('${pessoa.nome}')">Cancelar</button>`;
+      periodosFiltrados.forEach((p,i)=>{
+        const ini = parseDateTime(p[0]);
+        const fim = parseDateTime(p[1]);
+        const box = document.createElement("div");
+        box.style.cssText = "background:#f1f3f8;padding:10px;margin-bottom:8px;border-radius:8px;";
+        box.innerHTML = `
+          <div style="font-weight:600;margin-bottom:4px;">Período ${i+1}</div>
+          <label>Data início</label>
+          <input type="date" id="iniData_${nomeID}_${i}" value="${ini.toISOString().slice(0,10)}">
+          <label>Hora início</label>
+          <input type="time" id="iniHora_${nomeID}_${i}" value="${pad2(ini.getHours())}:${pad2(ini.getMinutes())}">
+          <label>Data fim</label>
+          <input type="date" id="fimData_${nomeID}_${i}" value="${fim.toISOString().slice(0,10)}">
+          <label>Hora fim</label>
+          <input type="time" id="fimHora_${nomeID}_${i}" value="${pad2(fim.getHours())}:${pad2(fim.getMinutes())}">
+          <button class="btn" style="margin-top:6px;background:#ffe5e5;border-color:#f5b5b5;"
+            onclick="removerFolgaFiltrada('${pessoa.nome}',${i})">🗑 Remover</button>
+        `;
+        div.appendChild(box);
+      });
+      const actions = document.createElement("div");
+      actions.style.marginTop = "6px";
+      actions.innerHTML = `
+        <button class="btn-primary needs-auth" onclick="salvarEdicao('${pessoa.nome}')" ${currentUser?'':'disabled'}>
+          ✔ Salvar
+        </button>
+        <button class="btn" onclick="cancelarEdicao('${pessoa.nome}')">✖ Cancelar</button>
+      `;
+      div.appendChild(actions);
     } else {
-      div.innerHTML = `<div class="titulo">${pessoa.nome}</div>
-        <button class="green" onclick="copiarFolgas('${pessoa.nome}')">📋 Copiar</button>
-        <button class="orange" onclick="editar('${pessoa.nome}')">✏ Editar</button>` +
-        mostrar.map((p,i)=> {
-          const ini = parseDateTime(p[0]), fim = parseDateTime(p[1]);
-          return `<div class="folga-item">
-            <div class="data">🗓 ${ini.toLocaleDateString("pt-BR")} → ${fim.toLocaleDateString("pt-BR")}</div>
-            <div class="hora">⏰ Das ${ini.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})} às ${fim.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})}</div>
-          </div>${i<mostrar.length-1?'<hr>':''}`;
-        }).join("");
+      periodosFiltrados.forEach((p,i)=>{
+        const ini = parseDateTime(p[0]), fim = parseDateTime(p[1]);
+        const item = document.createElement("div");
+        item.className = "folga-item";
+        item.innerHTML = `
+          <div class="data">🗓 ${ini.toLocaleDateString("pt-BR")} → ${fim.toLocaleDateString("pt-BR")}</div>
+          <div class="hora">⏰ Das ${ini.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}
+            às ${fim.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
+        `;
+        div.appendChild(item);
+        if(i<periodosFiltrados.length-1){
+          const hr = document.createElement("hr");
+          div.appendChild(hr);
+        }
+      });
     }
 
     lista.appendChild(div);
   });
 }
 
-/* -------------- EDIÇÃO -------------- */
-function editar(nome){ folgas.find(f=>f.nome===nome).editando = true; montarLista(); }
-function cancelarEdicao(nome){ folgas.find(f=>f.nome===nome).editando = false; montarLista(); }
+/* Edição */
+function editar(nome){
+  if(!ensureAuth()) return;
+  const f = folgas.find(x=>x.nome===nome);
+  if(!f) return;
+  f.editando = true;
+  montarLista();
+}
+function cancelarEdicao(nome){
+  const f = folgas.find(x=>x.nome===nome);
+  if(!f) return;
+  f.editando = false;
+  montarLista();
+}
 function removerFolgaFiltrada(nome, idxFiltrado){
+  if(!ensureAuth("Você precisa estar logado para editar/remover folgas.")) return;
   const filtroMes = document.getElementById("mesSelect").value;
   const pessoa = folgas.find(f=>f.nome===nome);
-  const filtrados = pessoa.periodos.filter(p=> p[0].startsWith(filtroMes));
+  if(!pessoa) return;
+  const filtrados = pessoa.periodos.filter(p=> filtroMes==="todos" || p[0].startsWith(filtroMes));
   const periodo = filtrados[idxFiltrado];
-  pessoa.periodos = pessoa.periodos.filter(p => !(p[0] === periodo[0] && p[1] === periodo[1]));
-  // manter Rafael/Vanderlei sincronizados
-  const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
-  if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
+  pessoa.periodos = pessoa.periodos.filter(p=> !(p[0]===periodo[0] && p[1]===periodo[1]));
   montarLista();
 }
-function adicionarFolga(nome){
-  const pessoa = folgas.find(f=>f.nome===nome);
-  const lastEnd = parseDateTime(pessoa.periodos[pessoa.periodos.length-1][1]);
-  let inicio;
-  if(lastEnd.getDay()===1){ inicio = new Date(lastEnd); inicio.setDate(inicio.getDate()+1); inicio.setHours(7,0,0,0); }
-  else { inicio = new Date(lastEnd.getTime() + 7*24*60*60*1000); if(inicio.getDay()===1){ inicio.setDate(inicio.getDate()+1); inicio.setHours(7,0,0,0); } }
-  const fim = new Date(inicio.getTime() + 36*60*60*1000);
-  pessoa.periodos.push([ formatDateTime(inicio), formatDateTime(fim) ]);
-  const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
-  if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
-  montarLista();
-}
+
 async function salvarEdicao(nome){
+  if(!ensureAuth("Você precisa estar logado para salvar alterações.")) return;
   const pessoa = folgas.find(f=>f.nome===nome);
+  if(!pessoa) return;
   const nomeID = nome.replace(/\s+/g,"_");
   const filtroMes = document.getElementById("mesSelect").value;
-  // coletar editados (índices locais)
-  const filtrados = pessoa.periodos.filter(p => filtroMes === "todos" || p[0].startsWith(filtroMes));
+  const filtrados = pessoa.periodos.filter(p=> filtroMes==="todos" || p[0].startsWith(filtroMes));
   const novosFiltrados = [];
   for(let i=0;i<filtrados.length;i++){
     const di = document.getElementById(`iniData_${nomeID}_${i}`).value;
@@ -374,120 +1085,95 @@ async function salvarEdicao(nome){
     const df = document.getElementById(`fimData_${nomeID}_${i}`).value;
     const hf = document.getElementById(`fimHora_${nomeID}_${i}`).value;
     if(!di||!hi||!df||!hf){ alert("Preencha todos os campos."); return; }
-    novosFiltrados.push([ `${di} ${hi}`, `${df} ${hf}` ]);
+    novosFiltrados.push([`${di} ${hi}`, `${df} ${hf}`]);
   }
-  // reconstruir lista completa mantendo períodos de outros meses
   const novos = [];
-  pessoa.periodos.forEach(p => { if(!p[0].startsWith(filtroMes)) novos.push(p); });
+  pessoa.periodos.forEach(p=>{ if(!(filtroMes!=="todos" && p[0].startsWith(filtroMes))) novos.push(p); });
   novos.push(...novosFiltrados);
-  pessoa.periodos = novos.sort((a,b)=> parseDateTime(a[0]) - parseDateTime(b[0]));
+  novos.sort((a,b)=> parseDateTime(a[0]) - parseDateTime(b[0]));
+  pessoa.periodos = novos;
   pessoa.editando = false;
-  // manter Rafael/Vanderlei
-  const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
-  if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
   montarLista();
   await salvarTodasNoBanco();
 }
 
-/* -------------- SUPABASE: CARREGAR / SALVAR -------------- */
+function copiarFolgas(nome){
+  const f = folgas.find(x=>x.nome===nome);
+  if(!f) return;
+  const filtroMes = document.getElementById("mesSelect").value;
+  let lista = f.periodos;
+  if(filtroMes!=="todos") lista = lista.filter(p=>p[0].startsWith(filtroMes));
+  if(lista.length===0){ alert("Sem folgas no mês selecionado."); return; }
+  const ref = `${lista[0][0].slice(5,7)}/${lista[0][0].slice(0,4)}`;
+  const texto = `Olá ${f.nome}! Aqui está sua escala de folgas para ${ref}:\n\n` +
+    lista.map(p=>`- ${p[0]} até ${p[1]}`).join("\n");
+  navigator.clipboard.writeText(texto).then(()=>showToast("Escala copiada para a área de transferência."))
+    .catch(()=>alert("Não foi possível copiar automaticamente."));
+}
+
+function mostrarFolgasAgora(){
+  const em = folgas.filter(f=>estaDeFolga(f.periodos));
+  if(em.length===0) alert("Ninguém está de folga agora.");
+  else alert("Em folga agora:\n\n" + em.map(x=>x.nome).join("\n"));
+}
+
+/* Supabase folgas */
 async function carregarFolgasDoBanco(){
-  try {
-    const { data, error } = await supabaseClient.from('folgas').select('*').order('inicio',{ascending:true});
+  try{
+    const { data, error } = await supabaseClient.from("folgas").select("*").order("inicio",{ascending:true});
     if(error){ console.error(error); alert("Erro ao carregar da nuvem."); return false; }
-    if(!data || data.length===0) return false;
-    // reset local
-    folgas.forEach(f=> f.periodos = []);
+    if(!data || data.length===0){
+      gerarMesesEscala();
+      popularFuncionariosEscala();
+      montarLista();
+      return false;
+    }
+    // reset e reconstruir
+    folgas = [];
     data.forEach(row=>{
-      const pessoa = folgas.find(p=>p.nome===row.funcionario);
-      if(pessoa) pessoa.periodos.push([ row.inicio, row.fim ]);
-      else folgas.push({ nome: row.funcionario, editando:false, periodos:[[row.inicio,row.fim]] });
+      let pessoa = folgas.find(f=>f.nome===row.funcionario);
+      if(!pessoa){
+        pessoa = { nome:row.funcionario, editando:false, periodos:[] };
+        folgas.push(pessoa);
+      }
+      pessoa.periodos.push([row.inicio, row.fim]);
     });
-    // garantir Rafael/Vanderlei
-    const r = folgas.find(x=>x.nome==="Rafael"), v = folgas.find(x=>x.nome==="Vanderlei");
-    if(r && v) v.periodos = JSON.parse(JSON.stringify(r.periodos));
-    // ordenar períodos
-    folgas.forEach(f=> f.periodos.sort((a,b)=> parseDateTime(a[0]) - parseDateTime(b[0])));
-    popularFuncionariosTo('funcSelect');
-    popularFuncionariosTo('funcSelectMenu');
-    gerarMesesNoSelects();
+    folgas.forEach(f=> f.periodos.sort((a,b)=> parseDateTime(a[0])-parseDateTime(b[0])));
+    gerarMesesEscala();
+    popularFuncionariosEscala();
     montarLista();
+    showToast("Escala carregada da nuvem.");
     return true;
-  } catch(e){ console.error(e); alert("Erro ao carregar do Supabase."); return false; }
+  }catch(e){
+    console.error(e);
+    alert("Erro ao carregar folgas.");
+    return false;
+  }
 }
 
 async function salvarTodasNoBanco(){
-  try {
-    await supabaseClient.from('folgas').delete().neq('id',0);
+  if(!ensureAuth("Você precisa estar logado para salvar na nuvem.")) return;
+  try{
+    await supabaseClient.from("folgas").delete().neq("id",0);
     const linhas = [];
-    folgas.forEach(f=> {
-      f.periodos.forEach(p=> linhas.push({ funcionario: f.nome, inicio: p[0], fim: p[1] }));
+    folgas.forEach(f=>{
+      f.periodos.forEach(p=>{
+        linhas.push({ funcionario:f.nome, inicio:p[0], fim:p[1] });
+      });
     });
     if(linhas.length){
-      const { error } = await supabaseClient.from('folgas').insert(linhas);
+      const { error } = await supabaseClient.from("folgas").insert(linhas);
       if(error){ console.error(error); alert("Erro ao salvar no banco."); return; }
     }
-    alert("Salvo na nuvem!");
-  } catch(e){ console.error(e); alert("Erro ao salvar na nuvem."); }
-}
-
-/* -------------- LOGIN / SESSÃO -------------- */
-const loginModal = document.getElementById("loginModal");
-const menuPopup = document.getElementById("menuPopup");
-const menuUser = document.getElementById("menuUser");
-const menuUserEmail = document.getElementById("menuUserEmail");
-const menuLoginBtn = document.getElementById("menuLoginBtn");
-const menuLogoutBtn = document.getElementById("menuLogoutBtn");
-
-menuLoginBtn.addEventListener("click", ()=> openLogin());
-menuLogoutBtn.addEventListener("click", async ()=>{
-  await supabaseClient.auth.signOut();
-  localStorage.removeItem("rememberMe");
-  menuUser.textContent = "Não conectado"; menuUserEmail.textContent = "";
-  menuLogoutBtn.classList.add("hidden"); menuLoginBtn.classList.remove("hidden");
-  alert("Deslogado");
-});
-
-function openLogin(){ document.getElementById("loginMsg").textContent=""; loginModal.style.display="flex"; }
-function closeLogin(){ loginModal.style.display="none"; }
-
-async function doLogin(){
-  const email = document.getElementById("loginEmail").value;
-  const pass = document.getElementById("loginPass").value;
-  const remember = document.getElementById("rememberMe").checked;
-  if(!email || !pass){ document.getElementById("loginMsg").textContent="Preencha email e senha."; return; }
-  document.getElementById("loginMsg").textContent = "Entrando...";
-  const res = await supabaseClient.auth.signInWithPassword({ email, password: pass });
-  if(res.error){ document.getElementById("loginMsg").textContent = res.error.message; return; }
-  // login ok
-  if(remember) localStorage.setItem("rememberMe","1");
-  loginModal.style.display="none";
-  menuUser.textContent = (res.data.user.user_metadata && res.data.user.user_metadata.full_name) ? res.data.user.user_metadata.full_name : res.data.user.email;
-  menuUserEmail.textContent = res.data.user.email;
-  menuLoginBtn.classList.add("hidden"); menuLogoutBtn.classList.remove("hidden");
-  alert("Logado com sucesso!");
-}
-
-// restore session
-(async function restoreSession(){
-  const s = await supabaseClient.auth.getSession();
-  if(s && s.data && s.data.session){
-    const user = s.data.session.user;
-    menuUser.textContent = (user.user_metadata && user.user_metadata.full_name) ? user.user_metadata.full_name : user.email;
-    menuUserEmail.textContent = user.email;
-    menuLoginBtn.classList.add("hidden"); menuLogoutBtn.classList.remove("hidden");
+    showToast("Escala salva na nuvem.");
+  }catch(e){
+    console.error(e);
+    alert("Erro ao salvar folgas.");
   }
-})();
+}
 
-/* -------------- MODO ESCURO -------------- */
-const darkToggle = document.getElementById("darkToggleMenu");
-darkToggle.addEventListener("change", ()=> {
-  if(darkToggle.checked){ document.documentElement.classList.add("dark"); localStorage.setItem("dark","1"); }
-  else { document.documentElement.classList.remove("dark"); localStorage.removeItem("dark"); }
-});
-if(localStorage.getItem("dark")){ darkToggle.checked=true; document.documentElement.classList.add("dark"); }
-
-/* -------------- NOTIFICAÇÕES LOCAIS -------------- */
-async function requestNotificationPermission(){ 
+/* Notificações locais */
+async function requestNotificationPermission(){
   if(!("Notification" in window)) return false;
   if(Notification.permission === "granted") return true;
   if(Notification.permission !== "denied"){
@@ -497,7 +1183,10 @@ async function requestNotificationPermission(){
   return false;
 }
 async function scheduleLocalReminders(){
-  if(!await requestNotificationPermission()) { alert("Permissão de notificações negada."); return; }
+  if(!await requestNotificationPermission()){
+    alert("Permissão de notificações negada.");
+    return;
+  }
   const now = new Date();
   folgas.forEach(p=>{
     p.periodos.forEach(pr=>{
@@ -505,130 +1194,368 @@ async function scheduleLocalReminders(){
       const fim = parseDateTime(pr[1]);
       const antesIni = new Date(ini.getTime() - 12*60*60*1000);
       if(antesIni > now){
-        setTimeout(()=> new Notification(`${p.nome} entra em folga`, { body: `Começa em ${ini.toLocaleString("pt-BR")}` }), antesIni - now);
+        setTimeout(()=> new Notification(`${p.nome} entra em folga`, { body:`Começa em ${ini.toLocaleString("pt-BR")}` }), antesIni - now);
       }
       const antesFim = new Date(fim.getTime() - 12*60*60*1000);
       if(antesFim > now){
-        setTimeout(()=> new Notification(`${p.nome} volta da folga`, { body: `Volta em ${fim.toLocaleString("pt-BR")}` }), antesFim - now);
+        setTimeout(()=> new Notification(`${p.nome} volta da folga`, { body:`Volta em ${fim.toLocaleString("pt-BR")}` }), antesFim - now);
       }
     });
   });
-  alert("Lembretes locais agendados (quando a aba estiver aberta).");
+  showToast("Lembretes configurados (válidos enquanto a aba estiver aberta).");
 }
 
-/* -------------- COPIAR / QUEM ESTÁ -------------- */
-function copiarFolgas(nome){
-  const f = folgas.find(x=>x.nome===nome);
-  const filtroMes = document.getElementById("mesSelect").value;
-  let lista = f.periodos;
-  if(filtroMes !== "todos") lista = lista.filter(p=>p[0].startsWith(filtroMes));
-  if(lista.length===0){ alert("Sem folgas no mês selecionado."); return; }
-  let ref = lista[0][0].slice(5,7)+"/"+lista[0][0].slice(0,4);
-  let texto = `Olá ${f.nome}! Aqui está sua escala de folgas para ${ref}:\n\n` + lista.map(p=>`- ${p[0]} até ${p[1]}`).join("\n");
-  navigator.clipboard.writeText(texto).then(()=>alert("Copiado!")).catch(()=>alert("Não foi possível copiar automaticamente."));
-}
-function mostrarFolgasAgora(){
-  const em = folgas.filter(f=>estaDeFolga(f.periodos));
-  if(em.length===0) alert("Ninguém está de folga agora.");
-  else alert("Em folga:\n" + em.map(x=>x.nome).join("\n"));
+/* ============ ABASTECIMENTO ============ */
+let listaAbastecimentos = []; // cache para filtro
+
+async function carregarMotoristasPlacas(){
+  // motoristas
+  let { data: mot } = await supabaseClient.from("motoristas").select("*").order("nome");
+  mot = (mot || []).filter(m=> m.ativo !== false);
+  const comboMot = document.getElementById("abastMotorista");
+  const filtroMot = document.getElementById("filtroMotorista");
+  comboMot.innerHTML = '<option value="">Selecione...</option>';
+  filtroMot.innerHTML = '<option value="">Todos</option>';
+  mot.forEach(m=>{
+    const o1 = document.createElement("option"); o1.value = m.nome; o1.textContent = m.nome; comboMot.appendChild(o1);
+    const o2 = document.createElement("option"); o2.value = m.nome; o2.textContent = m.nome; filtroMot.appendChild(o2);
+  });
+
+  // placas
+  let { data: pl } = await supabaseClient.from("placas").select("*").order("placa");
+  pl = (pl || []).filter(p=> p.ativo !== false);
+  const comboPl = document.getElementById("abastPlaca");
+  const filtroPl = document.getElementById("filtroPlaca");
+  comboPl.innerHTML = '<option value="">Selecione...</option>';
+  filtroPl.innerHTML = '<option value="">Todas</option>';
+  pl.forEach(p=>{
+    const o1 = document.createElement("option"); o1.value = p.placa; o1.textContent = p.placa; comboPl.appendChild(o1);
+    const o2 = document.createElement("option"); o2.value = p.placa; o2.textContent = p.placa; filtroPl.appendChild(o2);
+  });
 }
 
-/* -------------- GERAR PDF (jsPDF + autoTable) -------------- */
-async function gerarPDFFuncionarioMes(){
-  const func = document.getElementById("funcSelectMenu").value;
-  const mes = document.getElementById("mesSelectMenu").value;
-  if(func === "todos"){ alert("Escolha um funcionário no menu."); return; }
-  if(!mes || mes === "todos"){ alert("Escolha um mês/ano no menu."); return; }
-  const pessoa = folgas.find(f=>f.nome === func);
-  if(!pessoa){ alert("Funcionário não encontrado."); return; }
-  const rows = pessoa.periodos.filter(p=> p[0].startsWith(mes));
-  if(rows.length === 0){ alert("Sem folgas desse funcionário no mês selecionado."); return; }
+function atualizarResumoAbast(){
+  const span = document.getElementById("resumoAbast");
+  if(listaAbastecimentos.length===0){
+    span.textContent = "Nenhum registro com o filtro atual.";
+    return;
+  }
+  let total = 0, medias = [];
+  listaAbastecimentos.forEach(r=>{
+    total += Number(r.total||0);
+    medias.push(Number(r.media||0));
+  });
+  const mediaGeral = medias.length ? (medias.reduce((a,b)=>a+b,0)/medias.length) : 0;
+  span.textContent = `Total gasto: R$ ${total.toFixed(2)} | Média geral: ${mediaGeral.toFixed(2)} km/l (${listaAbastecimentos.length} registros)`;
+}
 
-  // montar PDF
+async function carregarAbastecimentos(){
+  try{
+    const { data, error } = await supabaseClient.from("abastecimentos").select("*").order("data",{ascending:true});
+    if(error){ console.error(error); alert("Erro ao carregar abastecimentos."); return; }
+    const placaF = document.getElementById("filtroPlaca").value;
+    const motF   = document.getElementById("filtroMotorista").value;
+    const mesF   = document.getElementById("filtroMes").value;
+    const anoF   = document.getElementById("filtroAno").value;
+
+    listaAbastecimentos = (data || []).filter(r=>{
+      if(placaF && r.placa !== placaF) return false;
+      if(motF && r.motorista !== motF) return false;
+      if(mesF || anoF){
+        const d = String(r.data);
+        const ano = d.slice(0,4);
+        const mes = d.slice(5,7);
+        if(anoF && ano !== anoF) return false;
+        if(mesF && mes !== mesF) return false;
+      }
+      return true;
+    });
+
+    const tbody = document.querySelector("#tabelaAbastecimentos tbody");
+    tbody.innerHTML = "";
+    listaAbastecimentos.forEach(r=>{
+      const tr = document.createElement("tr");
+      const d = String(r.data);
+      const dataBR = isNaN(Date.parse(d)) ? d : new Date(d).toLocaleDateString("pt-BR");
+      tr.innerHTML = `
+        <td>${dataBR}</td>
+        <td>${r.placa||""}</td>
+        <td>${r.motorista||""}</td>
+        <td>${r.combustivel||""}</td>
+        <td>${r.km_ant||""}</td>
+        <td>${r.km_atual||""}</td>
+        <td>${Number(r.litros||0).toFixed(2)}</td>
+        <td>${Number(r.valor_litro||0).toFixed(2)}</td>
+        <td>${Number(r.total||0).toFixed(2)}</td>
+        <td>${Number(r.media||0).toFixed(2)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    atualizarResumoAbast();
+  }catch(e){
+    console.error(e);
+    alert("Erro ao carregar abastecimentos.");
+  }
+}
+
+async function carregarUltimoKm(placa){
+  try{
+    const { data } = await supabaseClient
+      .from("abastecimentos")
+      .select("km_atual, placa")
+      .eq("placa", placa)
+      .order("data",{ascending:false})
+      .limit(1);
+    if(data && data.length){
+      return Number(data[0].km_atual || 0);
+    }
+    return 0;
+  }catch(e){
+    console.error(e);
+    return 0;
+  }
+}
+
+/* calcular valores */
+function recalcularAbastecimento(){
+  const kmAnt = parseFloat(document.getElementById("abastKmAnt").value || 0);
+  const kmAt  = parseFloat(document.getElementById("abastKmAtual").value || 0);
+  const litros= parseFloat(document.getElementById("abastLitros").value || 0);
+  const vl    = parseFloat(document.getElementById("abastVlrLitro").value || 0);
+  let total = 0, media = 0;
+  if(litros > 0){
+    total = litros * vl;
+    if(kmAt>kmAnt) media = (kmAt-kmAnt)/litros;
+  }
+  document.getElementById("abastTotal").value = total ? total.toFixed(2) : "";
+  document.getElementById("abastMedia").value = media ? media.toFixed(2) : "";
+}
+
+/* salvar abastecimento */
+async function salvarAbastecimento(){
+  if(!ensureAuth("Você precisa estar logado para registrar abastecimentos.")) return;
+  const data = document.getElementById("abastData").value;
+  const placa= document.getElementById("abastPlaca").value;
+  const mot  = document.getElementById("abastMotorista").value;
+  const comb = document.getElementById("abastComb").value;
+  const kmAnt= parseFloat(document.getElementById("abastKmAnt").value || 0);
+  const kmAt = parseFloat(document.getElementById("abastKmAtual").value || 0);
+  const litros = parseFloat(document.getElementById("abastLitros").value || 0);
+  const vlLitro= parseFloat(document.getElementById("abastVlrLitro").value || 0);
+
+  if(!data || !placa || !mot || !comb){
+    alert("Preencha data, placa, motorista e tipo de combustível.");
+    return;
+  }
+  if(kmAt <= kmAnt){
+    alert("KM atual deve ser maior que o KM anterior.");
+    return;
+  }
+  const total = litros * vlLitro;
+  const media = litros ? (kmAt-kmAnt)/litros : 0;
+
+  try{
+    const { error } = await supabaseClient.from("abastecimentos").insert({
+      data, placa, motorista:mot, combustivel:comb,
+      km_ant:kmAnt, km_atual:kmAt, litros, valor_litro:vlLitro,
+      total, media
+    });
+    if(error){ console.error(error); alert("Erro ao salvar abastecimento."); return; }
+    showToast("Abastecimento salvo.");
+    // limpar campos principais
+    document.getElementById("abastLitros").value = "";
+    document.getElementById("abastVlrLitro").value = "";
+    document.getElementById("abastKmAtual").value = "";
+    document.getElementById("abastTotal").value = "";
+    document.getElementById("abastMedia").value = "";
+    // recarregar lista
+    carregarAbastecimentos();
+  }catch(e){
+    console.error(e);
+    alert("Erro ao salvar abastecimento.");
+  }
+}
+
+/* gerar PDF de abastecimentos (filtro atual) */
+async function gerarPDFAbastecimentos(){
+  if(!ensureAuth("Você precisa estar logado para gerar PDFs.")) return;
+  if(listaAbastecimentos.length===0){
+    alert("Nenhum registro para gerar PDF com o filtro atual.");
+    return;
+  }
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const doc = new jsPDF({unit:"pt",format:"a4"});
   const pageWidth = doc.internal.pageSize.getWidth();
-
-  // header
   doc.setFontSize(14);
-  doc.text("Escala de Folgas", pageWidth/2, 40, { align: "center" });
-  doc.setFontSize(11);
-  doc.text(`Funcionário: ${pessoa.nome}`, 40, 70);
-  doc.text(`Mês/Ano: ${mes.slice(5,7)}/${mes.slice(0,4)}`, 40, 88);
+  doc.text("Relatório de Abastecimentos", pageWidth/2, 35,{align:"center"});
+  doc.setFontSize(10);
 
-  // tabela: converter para autoTable rows
-  const tableBody = rows.map(r=>{
-    const ini = parseDateTime(r[0]), fim = parseDateTime(r[1]);
+  const placaF = document.getElementById("filtroPlaca").value || "Todas";
+  const motF   = document.getElementById("filtroMotorista").value || "Todos";
+  const mesF   = document.getElementById("filtroMes").value || "Todos";
+  const anoF   = document.getElementById("filtroAno").value || "Todos";
+  doc.text(`Placa: ${placaF} | Motorista: ${motF} | Mês: ${mesF} | Ano: ${anoF}`,40,55);
+
+  const body = listaAbastecimentos.map(r=>{
+    const d = String(r.data);
+    const dataBR = isNaN(Date.parse(d)) ? d : new Date(d).toLocaleDateString("pt-BR");
     return [
-      ini.toLocaleDateString("pt-BR"),
-      `${ini.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})} → ${fim.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})}`,
-      `${r[0]} até ${r[1]}`
+      dataBR,
+      r.placa || "",
+      r.motorista || "",
+      r.combustivel || "",
+      r.km_ant || "",
+      r.km_atual || "",
+      Number(r.litros||0).toFixed(2),
+      Number(r.valor_litro||0).toFixed(2),
+      Number(r.total||0).toFixed(2),
+      Number(r.media||0).toFixed(2),
     ];
   });
 
-  // usar autoTable
   doc.autoTable({
-    startY: 110,
-    head: [["Data", "Horário", "Período (valor texto)"]],
-    body: tableBody,
-    styles: { fontSize:10 },
-    headStyles: { fillColor: [41, 128, 185] }
+    startY:70,
+    head:[["Data","Placa","Motorista","Comb.","Km ant","Km atual","Litros","R$/L","Total","Média"]],
+    body,
+    styles:{fontSize:8},
+    headStyles:{fillColor:[26,115,232]},
   });
 
-  // assinatura (em branco para você editar futuramente)
   const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 40 : 300;
   doc.setFontSize(11);
-  doc.text("Responsável Administrativo: ____________________________", 40, finalY + 20);
-  doc.text("(campo em branco para editar futuramente)", 42, finalY + 36);
-  doc.text(`Funcionário (${pessoa.nome}): ____________________________`, 40, finalY + 80);
+  doc.text("Responsável Administrativo: ____________________________",40,finalY);
+  doc.text("Funcionário (campo em branco para editar futuramente): ____________________________",40,finalY+24);
 
-  // salvar
-  const nomeArquivo = `Escala_${pessoa.nome.replace(/\s+/g,'_')}_${mes}.pdf`;
-  doc.save(nomeArquivo);
+  doc.save("relatorio_abastecimentos.pdf");
 }
 
-/* -------------- MENU UI -------------- */
-const hamburgerBtn = document.getElementById("hamburgerBtn");
-const menu = document.getElementById("menuPopup");
-hamburgerBtn.addEventListener("click", ()=> { menu.style.display = (menu.style.display === "block") ? "none" : "block"; });
-window.addEventListener("click", (e)=> { if(!menu.contains(e.target) && e.target !== hamburgerBtn) menu.style.display = "none"; });
-
-/* sincronizar selects do menu com os selects da página principal */
-document.getElementById("funcSelectMenu").addEventListener("change", (e)=>{
-  document.getElementById("funcSelect").value = e.target.value; montarLista();
+/* eventos de cálculo / auto km */
+document.getElementById("abastPlaca").addEventListener("change", async (e)=>{
+  const placa = e.target.value;
+  if(!placa) return;
+  const ultimo = await carregarUltimoKm(placa);
+  document.getElementById("abastKmAnt").value = ultimo ? ultimo.toFixed(1) : "";
+  recalcularAbastecimento();
 });
-document.getElementById("mesSelectMenu").addEventListener("change", (e)=>{
-  document.getElementById("mesSelect").value = e.target.value; montarLista();
+["abastKmAnt","abastKmAtual","abastLitros","abastVlrLitro"].forEach(id=>{
+  document.getElementById(id).addEventListener("input",recalcularAbastecimento);
 });
 
-/* botões do menu */
-document.getElementById("gerarPdfBtn").addEventListener("click", gerarPDFFuncionarioMes);
-document.getElementById("menuLoginBtn").addEventListener("click", openLogin);
-document.getElementById("menuLogoutBtn").addEventListener("click", async ()=> {
-  await supabaseClient.auth.signOut(); menuUser.textContent = "Não conectado"; menuUserEmail.textContent = ""; menuLoginBtn.classList.remove("hidden"); menuLogoutBtn.classList.add("hidden");
-});
+/* ============ MOTORISTAS ============ */
+async function listarMotoristas(){
+  const tbody = document.querySelector("#tabelaMotoristas tbody");
+  tbody.innerHTML = "";
+  const { data, error } = await supabaseClient.from("motoristas").select("*").order("nome");
+  if(error){ console.error(error); return; }
+  (data||[]).forEach(m=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${m.nome}</td>
+      <td>${m.ativo===false?"Inativo":"Ativo"}</td>
+      <td>
+        <button class="btn needs-auth" onclick="toggleMotoristaAtivo(${m.id}, ${m.ativo===false?1:0})" ${currentUser?"":"disabled"}>
+          ${m.ativo===false?"Reativar":"Desativar"}
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
 
-/* -------------- INICIALIZAÇÃO -------------- */
-async function initApp(){
-  gerarMesesNoSelects();
-  popularFuncionariosTo('funcSelect');
-  popularFuncionariosTo('funcSelectMenu');
-  // tenta carregar do Supabase; se vazio/erro usa geração local
-  const ok = await carregarFolgasDoBanco();
-  if(!ok){
-    gerarFolgasAte2026();
-    popularFuncionariosTo('funcSelect');
-    popularFuncionariosTo('funcSelectMenu');
-    gerarMesesNoSelects();
-    montarLista();
+async function adicionarMotorista(){
+  if(!ensureAuth("Você precisa estar logado para gerenciar motoristas.")) return;
+  const nome = document.getElementById("novoMotoristaNome").value.trim();
+  if(!nome){ alert("Informe o nome do motorista."); return; }
+  const { error } = await supabaseClient.from("motoristas").insert({ nome, ativo:true });
+  if(error){ console.error(error); alert("Erro ao inserir motorista."); return; }
+  document.getElementById("novoMotoristaNome").value = "";
+  await listarMotoristas();
+  await carregarMotoristasPlacas();
+  showToast("Motorista cadastrado.");
+}
+
+async function toggleMotoristaAtivo(id, ativar){
+  if(!ensureAuth("Você precisa estar logado para alterar motoristas.")) return;
+  const { error } = await supabaseClient.from("motoristas").update({ ativo:!!ativar }).eq("id",id);
+  if(error){ console.error(error); alert("Erro ao atualizar motorista."); return; }
+  await listarMotoristas();
+  await carregarMotoristasPlacas();
+}
+
+/* ============ PLACAS ============ */
+async function listarPlacas(){
+  const tbody = document.querySelector("#tabelaPlacas tbody");
+  tbody.innerHTML = "";
+  const { data, error } = await supabaseClient.from("placas").select("*").order("placa");
+  if(error){ console.error(error); return; }
+  (data||[]).forEach(p=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${p.placa}</td>
+      <td>${p.descricao||""}</td>
+      <td>${p.ativo===false?"Inativa":"Ativa"}</td>
+      <td>
+        <button class="btn needs-auth" onclick="togglePlacaAtivo(${p.id}, ${p.ativo===false?1:0})" ${currentUser?"":"disabled"}>
+          ${p.ativo===false?"Reativar":"Desativar"}
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function adicionarPlaca(){
+  if(!ensureAuth("Você precisa estar logado para gerenciar placas.")) return;
+  const placa = document.getElementById("novaPlacaValor").value.trim().toUpperCase();
+  const desc  = document.getElementById("novaPlacaDescricao").value.trim();
+  if(!placa){ alert("Informe a placa."); return; }
+  const { error } = await supabaseClient.from("placas").insert({ placa, descricao:desc, ativo:true });
+  if(error){ console.error(error); alert("Erro ao inserir placa."); return; }
+  document.getElementById("novaPlacaValor").value = "";
+  document.getElementById("novaPlacaDescricao").value = "";
+  await listarPlacas();
+  await carregarMotoristasPlacas();
+  showToast("Placa cadastrada.");
+}
+
+async function togglePlacaAtivo(id, ativar){
+  if(!ensureAuth("Você precisa estar logado para alterar placas.")) return;
+  const { error } = await supabaseClient.from("placas").update({ ativo:!!ativar }).eq("id",id);
+  if(error){ console.error(error); alert("Erro ao atualizar placa."); return; }
+  await listarPlacas();
+  await carregarMotoristasPlacas();
+}
+
+/* ============ INIT APP ============ */
+async function init(){
+  // preencher anos filtro
+  const anoSel = document.getElementById("filtroAno");
+  const anoAtual = (new Date()).getFullYear();
+  for(let a = anoAtual-3; a <= anoAtual+3; a++){
+    const o = document.createElement("option");
+    o.value = String(a); o.textContent = String(a);
+    anoSel.appendChild(o);
   }
-  // listeners principais
-  document.getElementById("funcSelect").addEventListener("change",(e)=> { document.getElementById("funcSelectMenu").value = e.target.value; montarLista(); });
-  document.getElementById("mesSelect").addEventListener("change",(e)=> { document.getElementById("mesSelectMenu").value = e.target.value; montarLista(); });
-  // init montagens
+
+
+  gerarMesesEscala();
+  popularFuncionariosEscala();
   montarLista();
+
+  await carregarMotoristasPlacas();
+  await carregarAbastecimentos();
+  await listarMotoristas();
+  await listarPlacas();
+
+  // tenta carregar folgas real
+  carregarFolgasDoBanco();
+
+  // listeners filtro escala
+  document.getElementById("funcSelect").addEventListener("change",montarLista);
+  document.getElementById("mesSelect").addEventListener("change",montarLista);
 }
-initApp();
+
+init();
 </script>
 </body>
 </html>
