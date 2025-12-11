@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Grupo TEM | Controle</title>
+       <link rel="icon" href="icone.ico" type="image/x-icon">
 
     <!-- jsPDF + autoTable para PDF da escala -->
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -934,7 +935,7 @@
 
     <!-- GERENCIAR MOTORISTAS/PLACAS MODAL -->
     <div class="modal-backdrop" id="mpBackdrop">
-      <div class="modal" style="max-width:460px;">
+      <div class="modal" style="max-width:600px;">
         <h3>Gerenciar Motoristas & Placas</h3>
         <p class="modal-small-text">Itens inativos deixam de aparecer nos formulários, mas permanecem no histórico.</p>
 
@@ -1225,7 +1226,7 @@
             <p>Registre abastecimentos, edite lançamentos e gere relatórios.</p>
           </div>
           <div class="stack-h">
-            <button class="btn btn-soft btn-sm" onclick="openMpModal()" data-auth="protected">Gerenciar Motoristas / Placas</button>
+            
             <button class="btn btn-soft btn-sm" onclick="loadAbastecimentos()">Atualizar do banco</button>
           </div>
         </div>
@@ -1478,6 +1479,7 @@
           </div>
           <div class="stack-h">
             <button class="btn btn-soft btn-sm" onclick="carregarCategorias()">Atualizar do banco</button>
+            <button class="btn btn-soft btn-sm" onclick="openMpModal()" data-auth="protected">Gerenciar Motoristas / Placas</button>
             <button class="btn btn-primary btn-sm" data-auth="protected" onclick="adicionarCategoriaLocal()">Adicionar categoria</button>
           </div>
         </div>
@@ -1686,12 +1688,7 @@
         "CNR-2909","CVN-2760","KWP-5A14","GDI-6C39",
         "CYS-9F15","PJD-4E60","QBW-9697"
       ];
-      const FUNCIONARIOS_FIXOS = [
-        "Anderson Saraiva Serrano","Luis Henrique de Souza",
-        "João Victor Amaro de Freitas","Vanderlei Leal",
-        "Fernando Manzano Rocha","Rafael",
-        "Thiago Henrique Ferracini Pereira","David", "Apoio"
-      ];
+      
       const SEGURADORAS_FIXAS = ["TOKIO","USS","FÁCIL","MOVIDA","MONDIAL","EUROP","VX","PARTICULAR","LEILÃO"];
       const EMPRESAS_FIXAS = ["ESTRELA","MARANI","TERUO","FORTI"];
 
@@ -1741,6 +1738,12 @@
 
       // Abastecimento
       let motoristasDb = [];  // [{id, nome, ativo}]
+      function getMotoristasAtivos() {
+        return motoristasDb
+          .filter(m => m.ativo !== false)
+          .map(m => m.nome);
+      }
+
       let placasDb = [];      // [{id, placa, ativo}]
       let abastecimentosData = []; // registros carregados
 
@@ -2014,20 +2017,41 @@
         lm.innerHTML = "";
         lp.innerHTML = "";
         motoristasDb.forEach(m=>{
-          const row = document.createElement("div");
-          row.style.display="flex";
-          row.style.justifyContent="space-between";
-          row.style.alignItems="center";
-          row.style.padding="3px 4px";
-          row.style.borderBottom="1px solid rgba(148,163,184,0.25)";
-          row.innerHTML = `<span>${m.nome}${m.ativo===false?" <span style='color:#f97316'>(inativo)</span>":""}</span>`;
-          const b = document.createElement("button");
-          b.className = "btn btn-ghost btn-sm";
-          b.textContent = m.ativo===false?"Ativar":"Inativar";
-          b.onclick = ()=> toggleMotoristaAtivo(m.id, m.ativo===false);
-          row.appendChild(b);
-          lm.appendChild(row);
-        });
+        const row = document.createElement("div");
+        row.style.display="flex";
+        row.style.justifyContent="space-between";
+        row.style.alignItems="center";
+        row.style.padding="3px 4px";
+        row.style.borderBottom="1px solid rgba(148,163,184,0.25)";
+
+        // Campo de edição inline
+        row.innerHTML = `
+          <input 
+            type="text" 
+            value="${m.nome}" 
+            id="editMot_${m.id}" 
+            style="flex:1; margin-right:6px; padding:4px;"
+          >
+          ${m.ativo===false ? "<span style='color:#f97316'>(inativo)</span>" : ""}
+        `;
+
+        // Botão salvar edição
+        const btnSalvar = document.createElement("button");
+        btnSalvar.className = "btn btn-primary btn-sm";
+        btnSalvar.textContent = "Salvar";
+        btnSalvar.onclick = ()=> editarMotorista(m.id);
+        row.appendChild(btnSalvar);
+
+        // Botão ativar / inativar
+        const btnToggle = document.createElement("button");
+        btnToggle.className = "btn btn-ghost btn-sm";
+        btnToggle.textContent = m.ativo===false ? "Ativar" : "Inativar";
+        btnToggle.onclick = ()=> toggleMotoristaAtivo(m.id, m.ativo===false);
+        row.appendChild(btnToggle);
+
+        lm.appendChild(row);
+      });
+
         placasDb.forEach(p=>{
           const row = document.createElement("div");
           row.style.display="flex";
@@ -2799,10 +2823,11 @@ function autoKmAnterior() {
         });
 
         const motSel = document.getElementById("calcServMotorista");
-        motSel.innerHTML = "";
-        FUNCIONARIOS_FIXOS.forEach(f=>{
-          motSel.innerHTML += `<option>${f}</option>`;
-        });
+          motSel.innerHTML = "";
+          getMotoristasAtivos().forEach(n => {
+            motSel.innerHTML += `<option>${n}</option>`;
+          });
+
 
         const placaEmp = document.getElementById("calcServPlacaEmp");
         placaEmp.innerHTML = "";
@@ -3031,8 +3056,11 @@ function autoKmAnterior() {
       // ========== COMISSÃO ==========
       function preencherCombosComissao(){
         const funcSel = document.getElementById("comFuncionario");
-        funcSel.innerHTML = "";
-        FUNCIONARIOS_FIXOS.forEach(f=> funcSel.innerHTML += `<option>${f}</option>`);
+          funcSel.innerHTML = "";
+          getMotoristasAtivos().forEach(n => {
+            funcSel.innerHTML += `<option>${n}</option>`;
+          });
+
 
         const placaSel = document.getElementById("comPlaca");
         const placaFiltro = document.getElementById("comFiltroPlaca");
@@ -3068,10 +3096,11 @@ function autoKmAnterior() {
         });
 
         const funcFiltro = document.getElementById("comFiltroFunc");
-        funcFiltro.innerHTML = `<option value="">Todos</option>`;
-        FUNCIONARIOS_FIXOS.forEach(f=>{
-          funcFiltro.innerHTML += `<option>${f}</option>`;
-        });
+          funcFiltro.innerHTML = `<option value="">Todos</option>`;
+          getMotoristasAtivos().forEach(n => {
+            funcFiltro.innerHTML += `<option>${n}</option>`;
+          });
+
 
         document.getElementById("comData").value = todayIso();
 
@@ -3116,18 +3145,26 @@ function autoKmAnterior() {
         editingComissaoId = null;
         document.getElementById("comissaoModoLabel").textContent = "Modo: novo lançamento";
         document.getElementById("comData").value = todayIso();
-        document.getElementById("comFuncionario").value = FUNCIONARIOS_FIXOS[0];
+
+        // Motoristas do Supabase
+        const ativos = getMotoristasAtivos();
+        document.getElementById("comFuncionario").value = ativos[0] || "";
+
         document.getElementById("comCategoria").value = categoriasMem[0]?.categoria || "Táxi";
         document.getElementById("comKmTotal").value = "";
+
+        // Placas continuam fixas (por enquanto)
         document.getElementById("comPlaca").value = PLACAS_FIXAS[0];
+
         document.getElementById("comOrigem").value = "";
         document.getElementById("comDestino").value = "";
+
         document.getElementById("comSeguradora").value = SEGURADORAS_FIXAS[0];
         document.getElementById("comEmpresa").value = EMPRESAS_FIXAS[0];
-       
-        
+
         document.getElementById("comValorCalc").value = "";
       }
+
 
       async function salvarComissao(){
         if(!currentUser){ alert("Faça login para salvar comissões."); return; }
@@ -3285,7 +3322,7 @@ function autoKmAnterior() {
         document.getElementById("comissaoModoLabel").textContent = "Modo: editando lançamento";
 
         document.getElementById("comData").value = reg.data || todayIso();
-        document.getElementById("comFuncionario").value = reg.funcionario || FUNCIONARIOS_FIXOS[0];
+        document.getElementById("comFuncionario").value = reg.funcionario || getMotoristasAtivos()[0] || "";
         document.getElementById("comCategoria").value = reg.categoria || categoriasMem[0]?.categoria || "Táxi";
         document.getElementById("comKmTotal").value = reg.km_total ?? "";
         document.getElementById("comPlaca").value = reg.placa || PLACAS_FIXAS[0];
@@ -3563,9 +3600,10 @@ function popularFiltrosServicos(){
   // Motoristas
   const motSel = document.getElementById("servFiltroMotorista");
   motSel.innerHTML = `<option value="">Todos</option>`;
-  FUNCIONARIOS_FIXOS.forEach(m => {
-    motSel.innerHTML += `<option>${m}</option>`;
-  });
+  getMotoristasAtivos().forEach(n => {
+  motSel.innerHTML += `<option>${n}</option>`;
+});
+
 
   // Placas empresa
   const placaSel = document.getElementById("servFiltroPlacaEmp");
@@ -3695,9 +3733,10 @@ function popularEdicaoServicos(){
   // Motoristas
   const motSel = document.getElementById("editServMotorista");
   motSel.innerHTML = "";
-  FUNCIONARIOS_FIXOS.forEach(m => {
-    motSel.innerHTML += `<option>${m}</option>`;
-  });
+  getMotoristasAtivos().forEach(n => {
+  motSel.innerHTML += `<option>${n}</option>`;
+});
+
 
   // Placas empresa
   const placaSel = document.getElementById("editServPlacaEmp");
@@ -3793,6 +3832,36 @@ async function gerarPDFServicos(){
       }
 
       restoreSession().then(initApp);
+
+      async function editarMotorista(id){
+  if(!currentUser){
+    alert("Faça login para editar.");
+    return;
+  }
+
+  const input = document.getElementById("editMot_" + id);
+  const novoNome = input.value.trim();
+
+  if(!novoNome){
+    alert("O nome não pode ficar vazio.");
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("motoristas")
+    .update({ nome: novoNome })
+    .eq("id", id);
+
+  if(error){
+    console.error(error);
+    alert("Erro ao renomear motorista.");
+    return;
+  }
+
+  await refreshMotoristasPlacas();
+  alert("Motorista atualizado com sucesso!");
+}
+
     </script>
 
 
