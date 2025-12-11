@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Grupo TEM | Controle</title>
-    <link rel="icon" href="icone.ico" type="image/x-icon">
 
     <!-- jsPDF + autoTable para PDF da escala -->
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -1646,7 +1645,9 @@
           <div class="stack-h" style="margin-bottom:8px;">
             <button class="btn btn-soft btn-sm" onclick="aplicarFiltroComissao()">Aplicar filtro</button>
             <button class="btn btn-ghost btn-sm" onclick="limparFiltroComissao()">Limpar filtro</button>
+            <button class="btn btn-primary btn-sm" onclick="gerarPDFComissoes()">Gerar PDF</button>
           </div>
+
 
           <div class="table-container">
             <table>
@@ -3154,13 +3155,23 @@ function autoKmAnterior() {
         }
 
         let valor = 0;
-        if(categoria.toLowerCase()==="táxi" || categoria.toLowerCase()==="taxi"){
-          valor = km_total * 1.70;
-        } else {
-          const [vk, vs] = [catDetalhe.valor_km, catDetalhe.valor_saida];
-          const km_para_calculo = Math.max(0, km_total - 40);
-          valor = vs + km_para_calculo * vk;
-        }
+        // Regras especiais
+          const catLower = categoria.toLowerCase();
+
+          if(catLower === "táxi" || catLower === "taxi"){
+              valor = km_total * 1.70;
+          }
+          else if(catLower === "leilão" || catLower === "leilao"){
+              // ⭐ REGRA DO LEILÃO = 120 × número de carros (campo KM total)
+              valor = km_total * 120;
+          }
+          else {
+              // Regras normais
+              const [vk, vs] = [catDetalhe.valor_km, catDetalhe.valor_saida];
+              const km_para_calculo = Math.max(0, km_total - 40);
+              valor = vs + km_para_calculo * vk;
+          }
+
 
         try{
           if(editingComissaoId){
@@ -3224,10 +3235,11 @@ function autoKmAnterior() {
             <td>${reg.empresa||""}</td>
             <td>${formatMoneyBR(reg.valor_total)}</td>
             <td>
-              <button class="btn btn-soft btn-sm" data-auth="protected" onclick="editarComissao(${reg.id})">Editar</button>
-              <button class="btn btn-danger btn-sm" data-auth="protected" onclick="excluirComissao(${reg.id})">Excluir</button>
+              <button class="btn btn-soft btn-sm" data-auth="protected" onclick="editarComissao('${reg.id}')">Editar</button>
+              <button class="btn btn-danger btn-sm" data-auth="protected" onclick="excluirComissao('${reg.id}')">Excluir</button>
             </td>
           `;
+
           body.appendChild(tr);
         });
         applyAuthProtection();
@@ -3303,28 +3315,31 @@ function autoKmAnterior() {
       }
 
       async function salvarServicoParticular(){
-    if(!currentUser){
-        alert("Faça login para salvar serviços particulares.");
-        return;
-    }
+  if(!currentUser){
+      alert("Faça login para salvar serviços particulares.");
+      return;
+  }
 
-    const origem = document.getElementById("calcOrigem").value.trim();
-    const destino = document.getElementById("calcDestino").value.trim();
-    const valor_total = Number(document.getElementById("calcServValorTotal").value || 0);
-    const status = document.getElementById("calcServStatus").value;
-    const motorista = document.getElementById("calcServMotorista").value;
-    const metodo_pagamento = document.getElementById("calcServMetodo").value;
-    const placa_empresa = document.getElementById("calcServPlacaEmp").value;
-    const placa_cliente = document.getElementById("calcServPlacaCli").value.trim();
-    const data_servico = document.getElementById("calcServData").value;
+  const origem = document.getElementById("calcOrigem").value.trim();
+  const destino = document.getElementById("calcDestino").value.trim();
+  const valor_total = Number((document.getElementById("calcServValorTotal").value || "0").toString().replace(",","."));
+  const status = document.getElementById("calcServStatus").value;
+  const motorista = document.getElementById("calcServMotorista").value;
+  const metodo_pagamento = document.getElementById("calcServMetodo").value;
+  const placa_empresa = document.getElementById("calcServPlacaEmp").value;
+  const placa_cliente = document.getElementById("calcServPlacaCli").value.trim();
+  const data_servico = document.getElementById("calcServData").value;
 
-    if(!origem || !destino || !valor_total || !motorista || !placa_empresa || !data_servico){
-        alert("Preencha todos os campos obrigatórios.");
-        return;
-    }
+  if(!origem || !destino || !valor_total || !motorista || !placa_empresa || !data_servico){
+      alert("Preencha todos os campos obrigatórios.");
+      return;
+  }
 
-    try{
-        const { error } = await supabaseClient.from("servicos_particulares").insert({
+  try{
+      // 1) Inserir serviço particular
+      const { data: servData, error: err1 } = await supabaseClient
+        .from("servicos_particulares")
+        .insert([{
             origem,
             destino,
             valor_total,
@@ -3334,23 +3349,162 @@ function autoKmAnterior() {
             placa_empresa,
             placa_cliente: placa_cliente || null,
             data_servico
-        });
+        }])
+        .select()
+        .single();
 
-        if(error) throw error;
+      if(err1) throw err1;
 
-        alert("Serviço particular salvo com sucesso!");
+      // 2) Inserir também na tabela de comissões (com os campos solicitados)
+      //    km_total = 0, categoria = "Particular", seguradora / empresa = "PARTICULAR"
+      const comissaoPayload = {
+        data: data_servico,
+        funcionario: motorista,
+        categoria: "Particular",
+        km_total: 0,
+        placa: placa_empresa,
+        origem,
+        destino,
+        seguradora: "PARTICULAR",
+        empresa: "PARTICULAR",
+        valor_total: valor_total
+      };
 
-        // Limpar campos após salvar
-        document.getElementById("calcServValorTotal").value = "0.00";
-        document.getElementById("calcServPlacaCli").value = "";
-        document.getElementById("calcServStatus").value = "Não pago";
-        document.getElementById("calcServMetodo").value = "Dinheiro";
-    }
-    catch(e){
-        console.error(e);
-        alert("Erro ao salvar serviço particular.");
-    }
+      const { error: err2 } = await supabaseClient
+        .from("comissoes")
+        .insert([comissaoPayload]);
+
+      if(err2) {
+        // se falhar na comissao, informamos mas não desfazemos o serviço salvo (cliente já tem serviço)
+        console.error(err2);
+        alert("Serviço salvo, mas houve erro ao inserir comissão: " + (err2.message || err2));
+      } else {
+        // ok
+      }
+
+      alert("Serviço particular salvo com sucesso!");
+
+      // Limpar campos após salvar
+      document.getElementById("calcServValorTotal").value = "0.00";
+      document.getElementById("calcServPlacaCli").value = "";
+      document.getElementById("calcServStatus").value = "Não pago";
+      document.getElementById("calcServMetodo").value = "Dinheiro";
+
+      // Recarregar ambas as tabelas para refletir o novo registro
+      await loadServicos();
+      await carregarComissoes();
+  }
+  catch(e){
+      console.error(e);
+      alert("Erro ao salvar serviço particular.");
+  }
 }
+
+async function gerarPDFComissoes(){
+  if(!currentUser){ alert("Faça login para gerar o PDF."); return; }
+
+  // Ler filtros atuais (mesma lógica de aplicarFiltroComissao)
+  const di = document.getElementById("comFiltroDataIni").value;
+  const df = document.getElementById("comFiltroDataFim").value;
+  const func = document.getElementById("comFiltroFunc").value;
+  const placa = document.getElementById("comFiltroPlaca").value;
+  const origemTxt = document.getElementById("comFiltroOrigem").value.trim().toLowerCase();
+  const seg = document.getElementById("comFiltroSeg").value;
+  const emp = document.getElementById("comFiltroEmp").value;
+
+  let arr = [...comissoesData];
+  if(di) arr = arr.filter(r=> r.data >= di);
+  if(df) arr = arr.filter(r=> r.data <= df);
+  if(func) arr = arr.filter(r=> r.funcionario===func);
+  if(placa) arr = arr.filter(r=> r.placa===placa);
+  if(origemTxt) arr = arr.filter(r=> (r.origem||"").toLowerCase().includes(origemTxt));
+  if(seg) arr = arr.filter(r=> r.seguradora===seg);
+  if(emp) arr = arr.filter(r=> r.empresa===emp);
+
+  if(arr.length === 0){
+    alert("Nenhum registro encontrado com os filtros aplicados.");
+    return;
+  }
+
+  // Totais
+  const totalGeral = arr.reduce((s,r)=> s + Number(r.valor_total || 0), 0);
+  const percentual = 0.06;
+  const totalComissao = totalGeral * percentual;
+
+  // Totais por funcionário (obj)
+  const porFuncionario = {};
+  arr.forEach(r=>{
+    const k = r.funcionario || "—";
+    porFuncionario[k] = (porFuncionario[k]||0) + Number(r.valor_total || 0);
+  });
+
+  // Totais por empresa
+  const porEmpresa = {};
+  arr.forEach(r=>{
+    const k = r.empresa || "—";
+    porEmpresa[k] = (porEmpresa[k]||0) + Number(r.valor_total || 0);
+  });
+
+  // Gerar PDF
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFontSize(14);
+  doc.text("Relatório de Comissões (filtrado)", pageWidth/2, 36, { align:"center" });
+  doc.setFontSize(10);
+  doc.text(`Gerado em: ${new Date().toLocaleString()}`, 40, 56);
+  doc.text(`Filtros - Data inicial: ${di||"—"}  final: ${df||"—"}  Funcionário: ${func||"Todos"}  Placa: ${placa||"Todas"}`, 40, 72);
+
+  doc.setFontSize(11);
+  doc.text(`Total geral (valor bruto): R$ ${formatMoneyBR(totalGeral)}`, 40, 96);
+  doc.text(`Total de comissão (6%): R$ ${formatMoneyBR(totalComissao)}`, 40, 112);
+
+  // Tabela principal
+  const body = arr.map(r=>[
+    r.data || "",
+    r.funcionario || "",
+    r.categoria || "",
+    r.km_total ?? "",
+    r.placa || "",
+    r.origem || "",
+    r.destino || "",
+    r.seguradora || "",
+    r.empresa || "",
+    formatMoneyBR(r.valor_total)
+  ]);
+
+  doc.autoTable({
+    startY: 140,
+    head: [["Data","Funcionário","Categoria","KM","Placa","Origem","Destino","Seguradora","Empresa","Valor (R$)"]],
+    body,
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [25,103,210] }
+  });
+
+  // Espaço após tabela
+  const afterY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 16 : 400;
+  doc.setFontSize(11);
+  doc.text("Totais por funcionário:", 40, afterY);
+  let y = afterY + 14;
+  Object.keys(porFuncionario).forEach(fn=>{
+    doc.text(`${fn}: R$ ${formatMoneyBR(porFuncionario[fn])}`, 48, y);
+    y += 12;
+  });
+
+  y += 8;
+  doc.text("Totais por empresa:", 40, y);
+  y += 14;
+  Object.keys(porEmpresa).forEach(empName=>{
+    doc.text(`${empName}: R$ ${formatMoneyBR(porEmpresa[empName])}`, 48, y);
+    y += 12;
+  });
+
+  // Salvar
+  const nomePDF = `Relatorio_Comissoes_${Date.now()}.pdf`;
+  doc.save(nomePDF);
+}
+
 
 // ====================== SERVIÇOS PARTICULARES ======================
 
@@ -3392,11 +3546,11 @@ function renderTabelaServicos(lista){
       <td>${s.status}</td>
       <td>${formatMoneyBR(s.valor_total)}</td>
       <td>
-        <button class="btn btn-soft btn-sm" data-auth="protected" onclick="editarServico(${s.id})">Editar</button>
-        <button class="btn btn-danger btn-sm" data-auth="protected" onclick="excluirServico(${s.id})">Excluir</button>
+        <button class="btn btn-soft btn-sm" data-auth="protected" onclick="editarServico('${s.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" data-auth="protected" onclick="excluirServico('${s.id}')">Excluir</button>
       </td>
-
     `;
+
     body.appendChild(tr);
   });
 
