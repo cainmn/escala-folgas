@@ -1479,7 +1479,7 @@
           </div>
           <div class="stack-h">
             <button class="btn btn-soft btn-sm" onclick="carregarCategorias()">Atualizar do banco</button>
-            <button class="btn btn-soft btn-sm" onclick="openMpModal()" data-auth="protected">Gerenciar Motoristas / Placas</button>
+            <button class="btn btn-soft btn-sm" onclick="openMpModal()" id="btnGerenciarMP">Gerenciar Motoristas / Placas</button>
             <button class="btn btn-primary btn-sm" data-auth="protected" onclick="adicionarCategoriaLocal()">Adicionar categoria</button>
           </div>
         </div>
@@ -2094,6 +2094,14 @@
         }
 
         applyAuthProtection();
+
+        // 🔓 garantir que o botão de Motoristas/Placas nunca fique disabled
+const btnMP = document.getElementById("btnGerenciarMP");
+if (btnMP) {
+  btnMP.disabled = false;
+  btnMP.classList.remove("btn-disabled");
+}
+
       }
 
 
@@ -2121,16 +2129,28 @@
       // ========== GERENCIADOR MOTORISTAS / PLACAS ==========
       const mpBackdrop = document.getElementById("mpBackdrop");
       function openMpModal(){
-        if(!currentUser){
-          alert("Faça login para gerenciar motoristas e placas.");
-          return;
-        }
-        mpBackdrop.style.display = "flex";
-        renderMotoristasPlacasUI();
-      }
-      function closeMpModal(){
-        mpBackdrop.style.display = "none";
-      }
+  if(!currentUser){
+    alert("Faça login para gerenciar motoristas e placas.");
+    return;
+  }
+
+  const mpBackdrop = document.getElementById("mpBackdrop");
+  if(!mpBackdrop){
+    console.error("mpBackdrop não encontrado");
+    return;
+  }
+
+  mpBackdrop.classList.add("active");
+  renderMotoristasPlacasUI();
+}
+
+function closeMpModal(){
+  const mpBackdrop = document.getElementById("mpBackdrop");
+  if(mpBackdrop){
+    mpBackdrop.classList.remove("active");
+  }
+}
+
 
       async function refreshMotoristasPlacas(){
         await loadMotoristasPlacas();
@@ -3611,8 +3631,10 @@ function autoKmAnterior() {
         destino,
         seguradora: "PARTICULAR",
         empresa: "PARTICULAR",
-        valor_total: valor_total
+        valor_total: valor_total,
+        servico_particular_id: servData.id // 🔗 vínculo
       };
+
 
       const { error: err2 } = await supabaseClient
         .from("comissoes")
@@ -3855,6 +3877,13 @@ async function excluirServico(id){
   if(!confirm("Deseja excluir este serviço?")) return;
 
   try{
+    // 1️⃣ Excluir comissão vinculada
+    await supabaseClient
+      .from("comissoes")
+      .delete()
+      .eq("servico_particular_id", id);
+
+    // 2️⃣ Excluir serviço particular
     const { error } = await supabaseClient
       .from("servicos_particulares")
       .delete()
@@ -3864,12 +3893,14 @@ async function excluirServico(id){
 
     alert("Serviço excluído.");
     await loadServicos();
+    await carregarComissoes();
   }
   catch(e){
     console.error(e);
     alert("Erro ao excluir serviço.");
   }
 }
+
 
 // ============================================================
 // =================== EDIÇÃO DE SERVIÇOS ======================
@@ -3943,15 +3974,36 @@ async function salvarEdicaoServico(){
 
     if(error) throw error;
 
-    fecharModalEditarServico();
-    await loadServicos();
-    alert("Serviço atualizado com sucesso!");
+    // Atualizar comissão vinculada
+await supabaseClient
+  .from("comissoes")
+  .update({
+    data: updateData.data_servico,
+    funcionario: updateData.motorista,
+    placa: updateData.placa_empresa,
+    origem: updateData.origem,
+    destino: updateData.destino,
+    valor_total: updateData.valor_total
+  })
+  .eq("servico_particular_id", editingServicoId);
+
+   fecharModalEditarServico();
+
+// 🔄 recarrega serviços E comissões
+await loadServicos();
+await carregarComissoes();
+
+alert("Serviço atualizado com sucesso!");
+
   }
   catch(e){
     console.error(e);
     alert("Erro ao salvar alterações.");
   }
 }
+
+
+
 
 function popularEdicaoServicos(){
   // Motoristas
