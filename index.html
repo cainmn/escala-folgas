@@ -14,6 +14,100 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
       <style>
+
+        /* Botão Recalcular Valor */
+.btn-recalcular {
+  background: transparent;
+  border: 1px solid #3b82f6; /* azul padrão */
+  color: #3b82f6;
+  padding: 6px 14px;
+  border-radius: 999px; /* pill */
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Hover */
+.btn-recalcular:hover {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+/* Active */
+.btn-recalcular:active {
+  transform: scale(0.96);
+}
+
+/* Disabled (caso use no futuro) */
+.btn-recalcular:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+        .toast button {
+  background: #b91c1c;
+  border: 1px solid rgba(255,255,255,.25);
+  color: #f9fafb;
+  padding: 6px 12px;
+  border-radius: 999px; /* pill */
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+       #toast-container {
+  position: fixed;
+  bottom: 20px; 
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+.toast {
+  min-width: 260px;
+  max-width: 340px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  animation: slideIn 0.3s ease, fadeOut 0.4s ease 10.6s forwards;
+}
+
+/* Tipos */
+.toast.success { background: #22c55e; }
+.toast.error   { background: #ef4444; }
+.toast.warning { background: #f59e0b; }
+.toast.info    { background: #2563eb; }
+
+@keyframes slideIn {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateX(120%);
+  }
+}
+
+
         :root{
           --bg:#f3f6fb;
           --bg-alt:#e3ebf7;
@@ -985,6 +1079,8 @@
 
   
   <body>
+    <div id="toast-container"></div>
+
 <button class="hamburger-btn" id="hamburgerBtn" aria-label="Abrir menu"></button> 
     <!-- LOGIN MODAL -->
     <div class="modal-backdrop" id="loginBackdrop">
@@ -1464,10 +1560,15 @@
         </div>
 
                 <div style="margin-top:12px; text-align:right;">
-          <button class="btn btn-primary btn-sm" onclick="salvarServicoParticular()">
-            Salvar serviço particular
-          </button>
-        </div>
+  <button
+    class="btn btn-primary btn-sm"
+    data-auth="protected"
+    onclick="salvarServicoParticular()"
+  >
+    Salvar serviço particular
+  </button>
+</div>
+
 
       </section>
 
@@ -1533,6 +1634,10 @@
               
             </div>
             <span class="pill" id="comissaoModoLabel">Modo: novo lançamento</span>
+            <button class="btn-recalcular" onclick="recalcularValorAutomatico()">
+  🔄 Recalcular valor
+</button>
+
           </div>
 
           <div class="grid-3" style="margin-bottom:8px;">
@@ -1561,7 +1666,12 @@
             </div>
             <div>
               <label>Valor calculado (R$)</label>
-              <input type="text" id="comValorCalc" readonly>
+              <input 
+  id="comValorCalc"
+  type="text"
+  class="input"
+  oninput="marcarValorManual()"
+/>
             </div>
           </div>
 
@@ -2053,7 +2163,7 @@
         currentUser = res.data.user;
         closeLoginModal();
         updateAuthUI();
-        alert("Logado com sucesso!");
+        toast("Logado com sucesso!");
       }
 
       async function logout(){
@@ -2061,7 +2171,7 @@
         currentUser = null;
         localStorage.removeItem("rememberMe");
         updateAuthUI();
-        alert("Você saiu da sua sessão.");
+        toast("Você saiu da sua sessão.");
       }
 
       function updateAuthUI(){
@@ -2131,7 +2241,7 @@ if (btnMP) {
       const mpBackdrop = document.getElementById("mpBackdrop");
       function openMpModal(){
   if(!currentUser){
-    alert("Faça login para gerenciar motoristas e placas.");
+    toast("Faça login para gerenciar motoristas e placas.");
     return;
   }
 
@@ -2231,12 +2341,12 @@ function closeMpModal(){
       }
 
       async function toggleMotoristaAtivo(id, novoAtivo){
-        if(!currentUser){ alert("Faça login."); return; }
+        if(!currentUser){ toast("Faça login."); return; }
         await supabaseClient.from("motoristas").update({ativo:novoAtivo}).eq("id",id);
         await refreshMotoristasPlacas();
       }
       async function togglePlacaAtivo(id, novoAtivo){
-        if(!currentUser){ alert("Faça login."); return; }
+        if(!currentUser){ toast("Faça login."); return; }
         await supabaseClient.from("placas").update({ativo:novoAtivo}).eq("id",id);
         await refreshMotoristasPlacas();
       }
@@ -2418,7 +2528,7 @@ function closeMpModal(){
       }
 
       function editarFolga(nome){
-        if(!currentUser){ alert("Faça login para editar."); return; }
+        if(!currentUser){ toast("Faça login para editar."); return; }
         const f = folgas.find(x=>x.nome===nome);
         if(f){ f.editando = true; montarListaEscala(); }
       }
@@ -2428,7 +2538,7 @@ function closeMpModal(){
       }
 
       function removerFolgaFiltrada(nome, idxFiltrado){
-        if(!currentUser){ alert("Faça login."); return; }
+        if(!currentUser){ toast("Faça login."); return; }
         const filtroMes = document.getElementById("escalaMesSelect").value;
         const pessoa = folgas.find(f=>f.nome===nome);
         const filtrados = pessoa.periodos.filter(p=> p[0].startsWith(filtroMes));
@@ -2439,7 +2549,7 @@ function closeMpModal(){
 
       function adicionarFolga(nome){
     if(!currentUser){
-        alert("Faça login para adicionar folgas.");
+        toast("Faça login para adicionar folgas.");
         return;
     }
 
@@ -2460,7 +2570,7 @@ function closeMpModal(){
         }
     });
     if (!card) {
-        alert("Erro interno: card não encontrado.");
+        toast("Erro interno: card não encontrado.");
         return;
     }
 
@@ -2500,7 +2610,7 @@ function closeMpModal(){
 
       async function salvarEdicaoFolga(nome){
     if(!currentUser){
-        alert("Faça login.");
+        toast("Faça login.");
         return;
     }
 
@@ -2523,7 +2633,7 @@ function closeMpModal(){
         const hFim = inputs[i+3].value;
 
         if(!dIni || !hIni || !dFim || !hFim){
-            alert("Preencha todos os campos antes de salvar.");
+            toast("Preencha todos os campos antes de salvar.");
             return;
         }
 
@@ -2544,7 +2654,7 @@ function closeMpModal(){
       async function carregarFolgasDoBanco(){
         try{
           const { data, error } = await supabaseClient.from("folgas").select("*").order("inicio",{ascending:true});
-          if(error){ console.error(error); alert("Erro ao carregar da nuvem."); return false; }
+          if(error){ console.error(error); toast("Erro ao carregar da nuvem."); return false; }
           if(!data || data.length===0){ montarListaEscala(); return false; }
 
           folgas.forEach(f=>f.periodos=[]);
@@ -2559,7 +2669,7 @@ function closeMpModal(){
           return true;
         } catch(e){
           console.error(e);
-          alert("Erro ao carregar folgas do Supabase.");
+          toast("Erro ao carregar folgas do Supabase.");
           return false;
         }
       }
@@ -2577,10 +2687,10 @@ function closeMpModal(){
             const { error } = await supabaseClient.from("folgas").insert(linhas);
             if(error) throw error;
           }
-          alert("Escala salva na nuvem.");
+          toast("Escala salva na nuvem.");
         } catch(e){
           console.error(e);
-          alert("Erro ao salvar escala na nuvem.");
+          toast("Erro ao salvar escala na nuvem.");
         }
       }
 
@@ -2589,29 +2699,29 @@ function closeMpModal(){
         const filtroMes = document.getElementById("escalaMesSelect").value;
         let lista = f.periodos;
         if(filtroMes!=="todos") lista = lista.filter(p=>p[0].startsWith(filtroMes));
-        if(lista.length===0){ alert("Sem folgas no mês selecionado."); return; }
+        if(lista.length===0){ toast("Sem folgas no mês selecionado."); return; }
         let ref = lista[0][0].slice(5,7)+"/"+lista[0][0].slice(0,4);
         let txt = `Olá ${f.nome}! Aqui está sua escala de folgas para ${ref}:\n\n` +
           lista.map(p=>`- ${p[0]} até ${p[1]}`).join("\n");
-        navigator.clipboard.writeText(txt).then(()=> alert("Copiado para a área de transferência.")).catch(()=> alert("Não foi possível copiar."));
+        navigator.clipboard.writeText(txt).then(()=> toast("Copiado para a área de transferência.")).catch(()=> toast("Não foi possível copiar."));
       }
 
       function mostrarFolgasAgora(){
         const em = folgas.filter(f=>estaDeFolga(f.periodos));
-        if(em.length===0) alert("Ninguém está de folga agora.");
-        else alert("Em folga:\n" + em.map(x=>x.nome).join("\n"));
+        if(em.length===0) toast("Ninguém está de folga agora.");
+        else toast("Em folga:\n" + em.map(x=>x.nome).join("\n"));
       }
 
       // PDF escala
       async function gerarPDFFuncionarioMes(){
-        if(!currentUser){ alert("Faça login para gerar o PDF."); return; }
+        if(!currentUser){ toast("Faça login para gerar o PDF."); return; }
         const funcSel = document.getElementById("escalaFuncSelect").value;
-        if(funcSel==="todos"){ alert("Selecione um funcionário nos filtros."); return; }
+        if(funcSel==="todos"){ toast("Selecione um funcionário nos filtros."); return; }
         const mes = document.getElementById("escalaMesSelect").value;
         const pessoa = folgas.find(f=>f.nome===funcSel);
-        if(!pessoa){ alert("Funcionário não encontrado."); return; }
+        if(!pessoa){ toast("Funcionário não encontrado."); return; }
         const rows = pessoa.periodos.filter(p=> p[0].startsWith(mes));
-        if(rows.length===0){ alert("Sem folgas no mês selecionado."); return; }
+        if(rows.length===0){ toast("Sem folgas no mês selecionado."); return; }
 
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({unit:'pt', format:'a4'});
@@ -2662,7 +2772,7 @@ function closeMpModal(){
       }
       async function scheduleLocalReminders(){
         if(!await requestNotificationPermission()){
-          alert("Permissão de notificações negada.");
+          toast("Permissão de notificações negada.");
           return;
         }
         const now = new Date();
@@ -2680,7 +2790,7 @@ function closeMpModal(){
             }
           });
         });
-        alert("Lembretes locais agendados (apenas enquanto a aba estiver aberta).");
+        toast("Lembretes locais agendados (apenas enquanto a aba estiver aberta).");
       }
 
       // ========== ABASTECIMENTO ==========
@@ -2717,7 +2827,7 @@ function closeMpModal(){
       }
 
       async function salvarAbastecimento(){
-        if(!currentUser){ alert("Faça login para lançar abastecimentos."); return; }
+        if(!currentUser){ toast("Faça login para lançar abastecimentos."); return; }
         const data = document.getElementById("abastData").value;
         const placa = document.getElementById("abastPlaca").value;
         const motorista = document.getElementById("abastMotorista").value;
@@ -2728,11 +2838,11 @@ function closeMpModal(){
         const valorLitro = Number(document.getElementById("abastValorLitro").value||0);
 
         if(!data || !placa || !motorista){
-          alert("Preencha data, placa e motorista.");
+          toast("Preencha data, placa e motorista.");
           return;
         }
         if(kmAt <= kmAnt){
-          alert("KM atual deve ser maior que KM anterior.");
+          toast("KM atual deve ser maior que KM anterior.");
           return;
         }
 
@@ -2748,7 +2858,7 @@ function closeMpModal(){
               total, media
             }).eq("id",editingAbastId);
             if(error) throw error;
-            alert("Abastecimento atualizado.");
+            toast("Abastecimento atualizado.");
           } else {
             const { error } = await supabaseClient.from("abastecimentos").insert({
             data,
@@ -2764,13 +2874,13 @@ function closeMpModal(){
           });
 
             if(error) throw error;
-            alert("Abastecimento salvo.");
+            toast("Abastecimento salvo.");
           }
           limparFormularioAbast();
           await loadAbastecimentos();
         } catch(e){
           console.error(e);
-          alert("Erro ao salvar abastecimento.");
+          toast("Erro ao salvar abastecimento.");
         }
       }
 
@@ -2788,7 +2898,7 @@ function closeMpModal(){
   if (mot) arr = arr.filter(r => r.motorista === mot);
 
   if (arr.length === 0) {
-    alert("Nenhum registro encontrado com os filtros aplicados.");
+    toast("Nenhum registro encontrado com os filtros aplicados.");
     return;
   }
 
@@ -2886,7 +2996,7 @@ function autoKmAnterior() {
           renderTabelaAbastecimentos();
         } catch(e){
           console.error(e);
-          alert("Erro ao carregar abastecimentos.");
+          toast("Erro ao carregar abastecimentos.");
         }
       }
 
@@ -2941,7 +3051,7 @@ function autoKmAnterior() {
       }
 
       function editarAbastecimento(id){
-        if(!currentUser){ alert("Faça login."); return; }
+        if(!currentUser){ toast("Faça login."); return; }
         const reg = abastecimentosData.find(r=>r.id===id);
         if(!reg) return;
         editingAbastId = id;
@@ -2959,18 +3069,35 @@ function autoKmAnterior() {
       }
 
       async function excluirAbastecimento(id){
-        if(!currentUser){ alert("Faça login."); return; }
-        if(!confirm("Deseja realmente excluir este abastecimento?")) return;
-        try{
-          const { error } = await supabaseClient.from("abastecimentos").delete().eq("id",id);
-          if(error) throw error;
-          alert("Excluído.");
-          await loadAbastecimentos();
-        } catch(e){
-          console.error(e);
-          alert("Erro ao excluir.");
-        }
+  if(!currentUser){
+    toast("Faça login para continuar.", "warning");
+    return;
+  }
+
+  toastAction({
+    message: "Deseja realmente excluir este abastecimento?",
+    type: "warning",
+    actionText: "Excluir",
+    onAction: async () => {
+      try{
+        const { error } = await supabaseClient
+          .from("abastecimentos")
+          .delete()
+          .eq("id", id);
+
+        if(error) throw error;
+
+        toast("Abastecimento excluído.", "success");
+        await loadAbastecimentos();
+
+      } catch(e){
+        console.error(e);
+        toast("Erro ao excluir abastecimento.", "error");
       }
+    }
+  });
+}
+
 
       // ========== CALCULADORA ==========
       function preencherCombosCalculadora(){
@@ -3202,14 +3329,14 @@ function autoKmAnterior() {
       }
     }
 
-    alert("Categorias salvas com sucesso.");
+    toast("Categorias salvas com sucesso.");
 
     // Recarrega da base para garantir sincronização perfeita
     carregarCategorias();
 
   } catch (e) {
     console.error(e);
-    alert("Erro ao salvar categorias.");
+    toast("Erro ao salvar categorias.");
   }
 }
 
@@ -3269,10 +3396,20 @@ function autoKmAnterior() {
         document.getElementById("comKmTotal").addEventListener("input", calcularValorComissao);
       }
 
-      function calcularValorComissao(){
-    const km_total = Number((document.getElementById("comKmTotal").value || "0").replace(",", "."));
+      function calcularValorComissao() {
+
+    // Se o valor foi editado manualmente, não recalcula
+    if (valorComissaoManual) return;
+
+    const km_total = Number(
+      (document.getElementById("comKmTotal").value || "0").replace(",", ".")
+    );
+
     const categoria = document.getElementById("comCategoria").value;
-    const catDetalhe = categoriasMem.find(c => c.categoria === categoria) || CATEGORIAS_FIXAS.find(c => c.categoria === categoria);
+
+    const catDetalhe =
+      categoriasMem.find(c => c.categoria === categoria) ||
+      CATEGORIAS_FIXAS.find(c => c.categoria === categoria);
 
     if (!catDetalhe || km_total <= 0) {
         document.getElementById("comValorCalc").value = "";
@@ -3281,17 +3418,19 @@ function autoKmAnterior() {
 
     let valor = 0;
 
-    // Verificando se a categoria é "Táxi"
+    // Táxi
     if (categoria.toLowerCase() === "táxi" || categoria.toLowerCase() === "taxi") {
         valor = km_total * 1.70;
     } 
-    // Verificando se a categoria é "Leilão"
+    // Leilão
     else if (categoria.toLowerCase() === "leilão" || categoria.toLowerCase() === "leilao") {
-        valor = km_total * 120; // Multiplica o km total por 120
+        valor = km_total * 120;
     } 
-    // Para as outras categorias
+    // Demais categorias
     else {
-        const [vk, vs] = [catDetalhe.valor_km, catDetalhe.valor_saida];
+        const vk = Number(catDetalhe.valor_km || 0);
+        const vs = Number(catDetalhe.valor_saida || 0);
+
         const km_para_calculo = Math.max(0, km_total - 40);
         valor = vs + km_para_calculo * vk;
     }
@@ -3299,7 +3438,13 @@ function autoKmAnterior() {
     document.getElementById("comValorCalc").value = formatMoneyBR(valor);
 }
 
-      
+
+      let valorComissaoManual = false;
+
+function marcarValorManual() {
+  valorComissaoManual = true;
+}
+
       
 
       function limparFormularioComissao(){
@@ -3328,80 +3473,76 @@ function autoKmAnterior() {
 
 
       async function salvarComissao(){
-        if(!currentUser){ alert("Faça login para salvar comissões."); return; }
-        const data = document.getElementById("comData").value;
-        const func = document.getElementById("comFuncionario").value;
-        const categoria = document.getElementById("comCategoria").value;
-        const km_total = Number((document.getElementById("comKmTotal").value||"0").replace(",","."));
-        const placa = document.getElementById("comPlaca").value;
-        const origem = document.getElementById("comOrigem").value.trim();
-        const destino = document.getElementById("comDestino").value.trim();
-        const seguradora = document.getElementById("comSeguradora").value;
-        const empresa = document.getElementById("comEmpresa").value;
-      
-       
+  if(!currentUser){
+    alert("Faça login para salvar comissões.");
+    return;
+  }
 
-        if(!data || !func || !categoria || !km_total || !origem || !destino || !seguradora || !empresa){
-          alert("Preencha todos os campos obrigatórios.");
-          return;
-        }
+  const data = document.getElementById("comData").value;
+  const func = document.getElementById("comFuncionario").value;
+  const categoria = document.getElementById("comCategoria").value;
+  const km_total = Number((document.getElementById("comKmTotal").value||"0").replace(",","."));
+  const placa = document.getElementById("comPlaca").value;
+  const origem = document.getElementById("comOrigem").value.trim();
+  const destino = document.getElementById("comDestino").value.trim();
+  const seguradora = document.getElementById("comSeguradora").value;
+  const empresa = document.getElementById("comEmpresa").value;
 
-        const catDetalhe = categoriasMem.find(c=>c.categoria===categoria) || CATEGORIAS_FIXAS.find(c=>c.categoria===categoria);
-        if(!catDetalhe){
-          alert("Categoria inválida.");
-          return;
-        }
+  // 👉 VALOR FINAL = o que estiver no input
+  const valorStr = document.getElementById("comValorCalc").value;
 
-        let valor = 0;
-        // Regras especiais
-          const catLower = categoria.toLowerCase();
+  const valor_total = Number(
+    valorStr.replace(/\./g,"").replace(",",".")
+  );
 
-          if(catLower === "táxi" || catLower === "taxi"){
-              valor = km_total * 1.70;
-          }
-          else if(catLower === "leilão" || catLower === "leilao"){
-              // ⭐ REGRA DO LEILÃO = 120 × número de carros (campo KM total)
-              valor = km_total * 120;
-          }
-          else {
-              // Regras normais
-              const [vk, vs] = [catDetalhe.valor_km, catDetalhe.valor_saida];
-              const km_para_calculo = Math.max(0, km_total - 40);
-              valor = vs + km_para_calculo * vk;
-          }
+  if(
+    !data || !func || !categoria || !km_total ||
+    !origem || !destino || !seguradora || !empresa
+  ){
+    alert("Preencha todos os campos obrigatórios.");
+    return;
+  }
 
+  if(isNaN(valor_total) || valor_total <= 0){
+    alert("Valor da comissão inválido.");
+    return;
+  }
 
-        try{
-          if(editingComissaoId){
-            const { error } = await supabaseClient.from("comissoes").update({
-              data, funcionario:func, categoria, km_total,
-              placa, origem, destino,
-              seguradora, empresa,
-              valor_total:valor,
-              
-              
-            }).eq("id",editingComissaoId);
-            if(error) throw error;
-            alert("Comissão atualizada.");
-          } else {
-            const { error } = await supabaseClient.from("comissoes").insert({
-              data, funcionario:func, categoria, km_total,
-              placa, origem, destino,
-              seguradora, empresa,
-              valor_total:valor,
-              
-             
-            });
-            if(error) throw error;
-            alert("Comissão salva.");
-          }
-          limparFormularioComissao();
-          await carregarComissoes();
-        } catch(e){
-          console.error(e);
-          alert("Erro ao salvar comissão.");
-        }
-      }
+  try{
+    const payload = {
+      data,
+      funcionario: func,
+      categoria,
+      km_total,
+      placa,
+      origem,
+      destino,
+      seguradora,
+      empresa,
+      valor_total // 🔥 automático OU manual
+    };
+
+    if(editingComissaoId){
+      await supabaseClient
+        .from("comissoes")
+        .update(payload)
+        .eq("id", editingComissaoId);
+    } else {
+      await supabaseClient
+        .from("comissoes")
+        .insert(payload);
+    }
+
+    toast("Comissão salva com sucesso!");
+    limparFormularioComissao();
+    await carregarComissoes();
+
+  } catch(e){
+    console.error(e);
+    toast("Erro ao salvar comissão.");
+  }
+}
+
 
       async function carregarComissoes(){
         try{
@@ -3411,7 +3552,7 @@ function autoKmAnterior() {
           renderTabelaComissoes();
         } catch(e){
           console.error(e);
-          alert("Erro ao carregar comissões.");
+          toast("Erro ao carregar comissões.");
         }
       }
 
@@ -3555,29 +3696,46 @@ function autoKmAnterior() {
 
     fecharModalEditarComissao();
     await carregarComissoes();
-    alert("Comissão atualizada com sucesso!");
+    toast("Comissão atualizada com sucesso!");
   }
   catch(e){
     console.error(e);
-    alert("Erro ao atualizar comissão.");
+    toast("Erro ao atualizar comissão.");
   }
 }
 
 
 
       async function excluirComissao(id){
-        if(!currentUser){ alert("Faça login."); return; }
-        if(!confirm("Excluir esta comissão?")) return;
-        try{
-          const { error } = await supabaseClient.from("comissoes").delete().eq("id",id);
-          if(error) throw error;
-          alert("Comissão excluída.");
-          await carregarComissoes();
-        } catch(e){
-          console.error(e);
-          alert("Erro ao excluir comissão.");
-        }
+  if(!currentUser){
+    toast("Faça login para continuar.", "warning");
+    return;
+  }
+
+  toastAction({
+    message: "Deseja realmente excluir esta comissão?",
+    type: "warning",
+    actionText: "Excluir",
+    onAction: async () => {
+      try{
+        const { error } = await supabaseClient
+          .from("comissoes")
+          .delete()
+          .eq("id", id);
+
+        if(error) throw error;
+
+        toast("Comissão excluída com sucesso.", "success");
+        await carregarComissoes();
+
+      } catch(e){
+        console.error(e);
+        toast("Erro ao excluir comissão.", "error");
       }
+    }
+  });
+}
+
 
       async function salvarServicoParticular(){
   if(!currentUser){
@@ -3644,12 +3802,12 @@ function autoKmAnterior() {
       if(err2) {
         // se falhar na comissao, informamos mas não desfazemos o serviço salvo (cliente já tem serviço)
         console.error(err2);
-        alert("Serviço salvo, mas houve erro ao inserir comissão: " + (err2.message || err2));
+        toast("Serviço salvo, mas houve erro ao inserir comissão: " + (err2.message || err2));
       } else {
         // ok
       }
 
-      alert("Serviço particular salvo com sucesso!");
+      toast("Serviço particular salvo com sucesso!");
 
       // Limpar campos após salvar
       document.getElementById("calcServValorTotal").value = "0.00";
@@ -3663,7 +3821,7 @@ function autoKmAnterior() {
   }
   catch(e){
       console.error(e);
-      alert("Erro ao salvar serviço particular.");
+      toast("Erro ao salvar serviço particular.");
   }
 }
 
@@ -3791,7 +3949,7 @@ async function loadServicos(){
   }
   catch(e){
     console.error(e);
-    alert("Erro ao carregar serviços particulares.");
+    toast("Erro ao carregar serviços particulares.");
   }
 }
 
@@ -3874,32 +4032,42 @@ function limparFiltroServicos(){
 
 
 async function excluirServico(id){
-  if(!currentUser){ alert("Faça login."); return; }
-  if(!confirm("Deseja excluir este serviço?")) return;
-
-  try{
-    // 1️⃣ Excluir comissão vinculada
-    await supabaseClient
-      .from("comissoes")
-      .delete()
-      .eq("servico_particular_id", id);
-
-    // 2️⃣ Excluir serviço particular
-    const { error } = await supabaseClient
-      .from("servicos_particulares")
-      .delete()
-      .eq("id", id);
-
-    if(error) throw error;
-
-    alert("Serviço excluído.");
-    await loadServicos();
-    await carregarComissoes();
+  if(!currentUser){
+    toast("Faça login para continuar.", "warning");
+    return;
   }
-  catch(e){
-    console.error(e);
-    alert("Erro ao excluir serviço.");
-  }
+
+  toastAction({
+    message: "Deseja realmente excluir este serviço?",
+    type: "warning",
+    actionText: "Excluir",
+    onAction: async () => {
+      try{
+        // 1️⃣ Excluir comissão vinculada
+        await supabaseClient
+          .from("comissoes")
+          .delete()
+          .eq("servico_particular_id", id);
+
+        // 2️⃣ Excluir serviço particular
+        const { error } = await supabaseClient
+          .from("servicos_particulares")
+          .delete()
+          .eq("id", id);
+
+        if(error) throw error;
+
+        toast("Serviço excluído com sucesso.", "success");
+
+        await loadServicos();
+        await carregarComissoes();
+      }
+      catch(e){
+        console.error(e);
+        toast("Erro ao excluir serviço.", "error");
+      }
+    }
+  });
 }
 
 
@@ -3994,12 +4162,12 @@ await supabaseClient
 await loadServicos();
 await carregarComissoes();
 
-alert("Serviço atualizado com sucesso!");
+toast("Serviço atualizado com sucesso!");
 
   }
   catch(e){
     console.error(e);
-    alert("Erro ao salvar alterações.");
+    toast("Erro ao salvar alterações.");
   }
 }
 
@@ -4199,8 +4367,76 @@ async function gerarPDFServicos(){
   }
 
   await refreshMotoristasPlacas();
-  alert("Motorista atualizado com sucesso!");
+  toast("Motorista atualizado com sucesso!");
 }
+
+
+function recalcularValorAutomatico() {
+  valorComissaoManual = false;
+  calcularValorComissao();
+}
+
+function toast(msg, type = "info", duration = 4000) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+
+  container.appendChild(el);
+
+  setTimeout(() => {
+    el.remove();
+  }, duration);
+}
+
+function toastAction({
+  message,
+  type = "info",
+  actionText = "OK",
+  onAction = null,
+  duration = 6000
+}) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+
+  const content = document.createElement("div");
+  content.className = "toast-content";
+  content.textContent = message;
+
+  toast.appendChild(content);
+
+  if (actionText && typeof onAction === "function") {
+    const btn = document.createElement("button");
+    btn.className = "toast-action";
+    btn.textContent = actionText;
+
+    btn.onclick = () => {
+      try {
+        onAction();
+      } finally {
+        toast.remove();
+      }
+    };
+
+    toast.appendChild(btn);
+  }
+
+  container.appendChild(toast);
+
+  // Auto remover
+  const timeout = setTimeout(() => {
+    toast.remove();
+  }, duration);
+
+  // Evitar remover duas vezes
+  toast.addEventListener("click", () => clearTimeout(timeout));
+}
+
 
     </script>
 
@@ -4208,4 +4444,3 @@ async function gerarPDFServicos(){
 
   </body>
   </html>
-
